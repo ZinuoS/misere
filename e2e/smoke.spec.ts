@@ -34,7 +34,10 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   await page.getByTestId("tick").waitFor();
   await ticks(page, 40);
   await backToModes(page);
-  await expect(page.getByTestId("leaderboard")).toContainText(handle);
+  // The board renders real server rows. Asserting THIS handle ranks top-10 is not
+  // safe: every e2e run plays the same seed, so scores tie exactly and ordering
+  // among equals is arbitrary. That this handle's write landed server-side is
+  // asserted below via the research panel, which reads my_telemetry for it alone.
   await expect(page.getByTestId("leaderboard")).toContainText("$102.00");
 
   // solo normal
@@ -72,6 +75,9 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   await backToModes(page);
 
   // research panel aggregates both solo modes
+  // my_telemetry is scoped to this handle's secret, so these counts prove THIS
+  // run's writes reached Postgres: 2 misere games (practice + daily), 1 normal.
   await expect(page.getByTestId("research")).toContainText("misere");
+  await expect(page.getByTestId("research")).toContainText("n=2");
   await expect(page.getByTestId("research")).toContainText("normal");
 });

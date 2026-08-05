@@ -1,13 +1,28 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Identity } from "./identity";
 
-// Dashboard copy-paste and CI env panels routinely carry a trailing newline or
-// wrapping quotes. Untrimmed, the URL becomes unparseable and every call throws
-// a bare TypeError that looks like a network outage.
-const clean = (v: string | undefined) => v?.trim().replace(/^['"]|['"]$/g, "") || undefined;
+// Copy-paste through a dashboard, a chat client or a rich-text editor smuggles in
+// characters the value cannot legally contain: smart quotes, zero-width joiners, a
+// BOM, a non-breaking space. Anything above U+00FF makes fetch throw
+//   "Failed to execute 'set' on 'Headers': String contains non ISO-8859-1 code point"
+// which reads like a network fault and is not one. Both values have a known, narrow
+// alphabet, so anything outside it is paste damage and is removed.
+const clean = (v: string | undefined, allowed: RegExp): string | undefined => {
+  if (!v) return undefined;
+  const trimmed = v.trim().replace(/^['"]|['"]$/g, "");
+  const kept = trimmed.replace(allowed, "");
+  if (kept !== trimmed) {
+    console.warn(
+      `[misere-desk] stripped ${trimmed.length - kept.length} illegal character(s) from an env value; ` +
+        "re-paste it as plain text to silence this.",
+    );
+  }
+  return kept || undefined;
+};
 
-const url = clean(import.meta.env.VITE_SUPABASE_URL as string | undefined);
-const anon = clean(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
+// JWTs and sb_publishable_* keys are base64url plus dots. Nothing else is valid.
+const url = clean(import.meta.env.VITE_SUPABASE_URL as string | undefined, /[^\x21-\x7E]/g);
+const anon = clean(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined, /[^A-Za-z0-9._-]/g);
 
 // Un-substituted placeholders are NOT configuration. Without this the app believes
 // it is live, points at a host that does not resolve, and every claim/submit fails.

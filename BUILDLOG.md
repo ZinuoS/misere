@@ -192,4 +192,25 @@ removes them; the anon key deliberately cannot delete, so that runs in the SQL e
 **Note on keys:** the anon/publishable key is meant to be public — it is shipped in the client
 bundle by design and RLS is what protects the data. No service-role key was used or needed.
 
+## Production bug — handle claim rejected on the deployed site
+
+**Symptom.** On the live Vercel deploy, claiming a handle failed on mobile with "the registry is unreachable".
+
+**My first response was wrong in method:** I guessed at causes (mangled key, carrier filtering, stale service worker) because the catch block collapsed every failure mode into one generic string. The actual first fix was to stop hiding the error — surface the thrown message, log it, and show which registry the build is talking to. The next deploy then reported the real fault immediately:
+
+```
+TypeError: Failed to execute 'set' on 'Headers':
+String contains non ISO-8859-1 code point
+```
+
+**Root cause.** The anon key stored in Vercel carried a character above U+00FF — smart quote, zero-width space or BOM, picked up in copy-paste. `fetch` refuses to place such a string in the `apikey` header, so the request never left the browser. Nothing was wrong with the key's validity, the network, the RLS policies or the carrier.
+
+**Fix.** Both env values have a narrow legal alphabet — a JWT/`sb_publishable_*` key is base64url plus dots, the URL is printable ASCII — so anything outside it is paste damage and is stripped at load, with a console warning naming how many characters were removed. This makes the app immune to the same paste damage on any future redeploy or environment.
+
+**Regression test** (`src/test/env.spec.ts`) reproduces the failure against the real `Headers` API: keys poisoned with a zero-width space, BOM, smart quotes and an em dash all throw before cleaning and all pass after. A separate case pins the subtler one — a non-breaking space is *legal* Latin-1, so it never trips the header check and would instead have produced a silent 401; it is stripped too.
+
+**Also fixed in this pass:** requests now abort after 12s instead of hanging on a stalled network, and the SW cache version was bumped so a redeploy cannot keep serving stale chunks.
+
+**Test-data debt this exposed.** Every e2e run plays the same seed, so every throwaway row scores exactly $102.00. Ten tied rows now saturate the top-10 leaderboard, and the smoke test's "this handle appears on the board" assertion became order-dependent and flaky. Rewritten to assert what it actually means: the board renders real server rows, and the *per-handle* write is proven via the research panel, which reads `my_telemetry` scoped to that handle's secret (n=2 misère, n=1 normal). `supabase/cleanup_test_rows.sql` must be run before launch.
+
 **REMAINING: deploy only.** `.env.local` holds placeholders, not real Supabase credentials, so the migration has not run against a real project and nothing is deployed. Vercel CLI is not authenticated on this machine (`vercel login` is interactive and cannot be driven from here).
