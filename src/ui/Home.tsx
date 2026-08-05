@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BAND, COMP_T, INV_CAP, MIN_SPREAD, SOLO_T } from "../engine/types";
 import { countdown, dailyNumber, msToNextDaily, type DailyStats } from "../data/daily";
+import { session, SESSION_HOURS } from "../data/market";
 import type { Identity } from "../data/identity";
 import { money, Panel } from "./atoms";
 import { Leaderboard, ResearchPanel } from "./Panels";
@@ -8,7 +9,7 @@ import { Leaderboard, ResearchPanel } from "./Panels";
 const MODES = [
   {
     id: "misere", testid: "mode-misere", title: "Solo — Misère",
-    blurb: `Practice: lose as much as possible in ${SOLO_T} ticks. Fresh tape every run.`,
+    blurb: `Practice desk, always open. Lose as much as possible in ${SOLO_T} ticks. Fresh tape every run.`,
   },
   {
     id: "normal", testid: "mode-normal", title: "Solo — Normal",
@@ -41,8 +42,12 @@ export function Home({ onPick, identity, today, dailyResult, stats, refreshKey, 
   onStats: () => void;
 }) {
   const [left, setLeft] = useState(msToNextDaily());
+  const [sess, setSess] = useState(session());
   useEffect(() => {
-    const id = setInterval(() => setLeft(msToNextDaily()), 1000);
+    const id = setInterval(() => {
+      setLeft(msToNextDaily());
+      setSess(session());
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -56,13 +61,27 @@ export function Home({ onPick, identity, today, dailyResult, stats, refreshKey, 
 
       <div data-testid="daily-card" className="rounded-lg border-2 border-ink bg-panel p-4">
         <div className="flex items-baseline justify-between">
-          <span className="font-display text-xl font-black uppercase tracking-tight">The Daily</span>
-          <span className="font-mono text-xs uppercase tracking-widest text-muted">
-            No.{dailyNumber(today)} &middot; {today}
+          <span className="font-display text-xl font-black uppercase tracking-tight">The Exchange</span>
+          <span className="shrink-0 whitespace-nowrap font-mono text-xs uppercase tracking-widest text-muted">
+            Session {dailyNumber(today)}
           </span>
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-muted">
-          One tape, everyone. One scored attempt. Mis&egrave;re rules: most destroyed wins the day.
+        <div data-testid="session-status" className="mt-2 flex items-center gap-2">
+          <span
+            aria-hidden
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ background: sess.phase === "open" ? "var(--p2)" : "var(--muted)" }}
+          />
+          <span className="font-mono text-xs uppercase tracking-widest" style={{ color: sess.phase === "open" ? "var(--p2)" : "var(--muted)" }}>
+            {sess.label}
+          </span>
+          <span className="font-mono text-xs uppercase tracking-widest text-muted">
+            &middot; {sess.next} {sess.clock} &middot; {today}
+          </span>
+        </div>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          The floor trades {SESSION_HOURS}. One tape for every desk, one scored attempt.
+          Mis&egrave;re rules: most destroyed takes the session.
         </p>
         {dailyResult ? (
           <div className="mt-3">
@@ -80,22 +99,38 @@ export function Home({ onPick, identity, today, dailyResult, stats, refreshKey, 
               Statistics
             </button>
           </div>
-        ) : (
+        ) : sess.phase === "open" ? (
           <>
             <button
               onClick={() => onPick("daily")}
               data-testid="mode-daily"
               className="mt-3 w-full rounded-full bg-ink py-3.5 font-mono text-sm uppercase tracking-widest text-paper"
             >
-              Play today's tape
+              Take the floor
             </button>
             {stats.played === 0 && (
-              <p className="mt-2 text-xs italic text-muted">No daily played yet. Today's tape is waiting.</p>
+              <p className="mt-2 text-xs italic text-muted">
+                No session traded yet. Today's tape is on the floor.
+              </p>
             )}
           </>
+        ) : (
+          <div data-testid="market-closed" className="mt-3">
+            <div className="rounded-md border border-hair bg-panel2 p-3 text-center">
+              <p className="font-mono text-xs uppercase tracking-widest text-muted">
+                {sess.phase === "pre-open" ? "The bell has not rung" : "The floor is dark"}
+              </p>
+              <p className="mt-1 font-mono text-sm">
+                {sess.next} in <span className="text-ink">{sess.clock}</span>
+              </p>
+            </div>
+            <p className="mt-2 text-xs italic text-muted">
+              Practice desks below stay open around the clock.
+            </p>
+          </div>
         )}
         <div data-testid="countdown" className="mt-3 text-center font-mono text-xs uppercase tracking-widest text-muted">
-          next daily in <span className="text-ink">{countdown(left)}</span>
+          tape rolls over in <span className="text-ink">{countdown(left)}</span>
         </div>
       </div>
 

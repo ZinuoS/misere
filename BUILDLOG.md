@@ -151,4 +151,14 @@ Box-drawing and block elements only; the emoji grep passes. Strip is one glyph p
 
 **Verification (all after the changes):** 24 unit tests green; dummy 13 rows / 0 failures with the daily replay identical and the second submission rejected; 26 screenshot runs; all-mode smoke green on desktop and mobile; Lighthouse mobile **93** (FCP 1.7s, LCP 3.0s, CLS 0, TBT 0ms); PWA check green (standalone manifest, 4 icons, offline reload OK). Banned-word and emoji greps clean.
 
+## M6c — The Exchange: session hours
+
+**Built:** the daily is now framed as a trading session on an exchange rather than a puzzle-of-the-day. `data/market.ts` gives three phases off the UTC clock — pre-open, open, closed — with the bell each phase counts toward. The floor trades **13:30-20:00 UTC** (09:30-16:00 ET, the real hours, which is the joke). Home card becomes THE EXCHANGE with a status dot, the live bell countdown, and "Take the floor" in place of "Play today's tape"; closed shows "The floor is dark" / "The bell has not rung" with the countdown to the next open. Results screen counts to the same bell. Practice desks are explicitly always open and unaffected.
+
+**Tradeoff named up front.** A 6.5-hour window is more fun but locks out anyone whose waking hours miss it, and the daily is the research instrument — fewer sessions means fewer paired observations for the primary hypothesis. `OPEN_MIN`/`CLOSE_MIN` are two constants with a `ponytail:` note; setting 00:00-24:00 makes it always open if submissions come in thin. Weekend closure was deliberately NOT modelled — thematic, but it would cut the dataset by two sevenths.
+
+**Tests:** 4 session tests (bell boundaries to the second, the right countdown target per phase, the closed countdown rolling across midnight without going negative, the window matching real ET hours). 29 unit tests total. E2E pins the clock with Playwright's `page.clock.setFixedTime` rather than adding a test-only override to production code; new screenshots cover the open and closed floor.
+
+**Also in this pass:** candle-rain personal-best flourish, `© Zinuo Shi` byline, LICENSE, `.env.example`, secure-context handle-claim fix and mobile input hardening (see the commit).
+
 **STILL BLOCKED — not deployed.** `.env.local` holds placeholders, not real Supabase credentials, so the migration has not run against a real project and nothing is deployed. Vercel CLI is not authenticated on this machine (`vercel login` is interactive and cannot be driven from here).

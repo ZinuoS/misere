@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { SoloState } from "../engine/solo";
 import { soloTruePnl, soloBotPnl } from "../engine/solo";
 import { decompose, type Decomposition } from "../engine/decompose";
-import { countdown, msToNextDaily, shareCard, SITE_URL, type DailyStats } from "../data/daily";
+import { shareCard, SITE_URL, type DailyStats } from "../data/daily";
+import { session } from "../data/market";
 import type { DailyResult } from "./Home";
 import { money, Panel, WBar } from "./atoms";
 import { verdict } from "./verdicts";
@@ -38,16 +39,16 @@ function DailyShareBlock({ result, dec, onStats }: {
   result: DailyResult; dec: Decomposition; onStats: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [left, setLeft] = useState(msToNextDaily());
+  const [sess, setSess] = useState(session());
   useEffect(() => {
-    const id = setInterval(() => setLeft(msToNextDaily()), 1000);
+    const id = setInterval(() => setSess(session()), 1000);
     return () => clearInterval(id);
   }, []);
   const text = shareCard(result.date, result.score, dec, SITE_URL);
   return (
     <Panel className="p-4">
       <div data-testid="daily-share">
-        <div className="mb-2 text-xs uppercase tracking-widest text-muted">Today's damage report</div>
+        <div className="mb-2 text-xs uppercase tracking-widest text-muted">Session damage report</div>
         <pre className="overflow-x-auto rounded-md border border-hair bg-panel2 p-3 font-mono text-xs leading-relaxed">{text}</pre>
         <button
           onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
@@ -64,7 +65,7 @@ function DailyShareBlock({ result, dec, onStats }: {
           Statistics
         </button>
         <div data-testid="countdown" className="mt-3 text-center font-mono text-xs uppercase tracking-widest text-muted">
-          next daily in <span className="text-ink">{countdown(left)}</span>
+          {sess.next} in <span className="text-ink">{sess.clock}</span>
         </div>
       </div>
     </Panel>

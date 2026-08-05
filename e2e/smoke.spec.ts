@@ -23,6 +23,7 @@ async function backToModes(page: Page) {
 test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   test.setTimeout(120_000);
   await page.addInitScript(() => localStorage.setItem("md:onboard", "1"));
+  await page.clock.setFixedTime(new Date("2026-08-05T15:00:00Z")); // exchange open
   await page.goto("/?seed=1");
   await claim(page, "dummy_smoke");
 
@@ -46,7 +47,7 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   await ticks(page, 40);
   await expect(page.getByTestId("daily-share")).toBeVisible();
   await expect(page.getByTestId("share-copy")).toBeVisible();
-  await expect(page.getByTestId("countdown")).toContainText("next daily in");
+  await expect(page.getByTestId("countdown")).toContainText("closing bell");
   await backToModes(page);
   await expect(page.getByTestId("daily-done")).toBeVisible(); // one scored attempt: replay is gone
   await expect(page.getByTestId("mode-daily")).toHaveCount(0);

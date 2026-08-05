@@ -6,6 +6,11 @@ const shot = (name: string, project: string) => `screenshots/${name}-${project}.
 const skipOnboard = (page: Page) =>
   page.addInitScript(() => localStorage.setItem("md:onboard", "1"));
 
+// The exchange only trades 13:30-20:00 UTC. Pin the clock mid-session so the
+// daily is reachable regardless of when the suite runs.
+const OPEN_TIME = new Date("2026-08-05T15:00:00Z");
+const openMarket = (page: Page) => page.clock.setFixedTime(OPEN_TIME);
+
 // Fresh context per test: the gate always shows first. Claim through the real UI.
 async function claim(page: Page, handle = "dummy_desk") {
   await page.getByTestId("gate-input").fill(handle);
@@ -64,13 +69,14 @@ test("m05b-how-to-play", async ({ page }, ti) => {
 
 test("m05b-daily-results-and-stats", async ({ page }, ti) => {
   await skipOnboard(page);
+  await openMarket(page);
   await page.goto("/");
   await claim(page);
   await page.getByTestId("mode-daily").click();
   await page.getByTestId("tick").waitFor();
   await playToEnd(page);
   await expect(page.getByTestId("daily-share")).toBeVisible();
-  await expect(page.getByTestId("countdown")).toContainText("next daily in");
+  await expect(page.getByTestId("countdown")).toContainText("closing bell");
   await page.screenshot({ path: shot("m05b-daily-results", ti.project.name), fullPage: true });
   await page.getByTestId("open-stats").click();
   await expect(page.getByTestId("stats")).toBeVisible();
@@ -113,11 +119,25 @@ test("m02-verdict-accidental-profit", async ({ page }, ti) => {
   await page.screenshot({ path: shot("m02-verdict-accidental-profit", ti.project.name), fullPage: true });
 });
 
-test("m03b-daily-home", async ({ page }, ti) => {
+test("m03b-exchange-open", async ({ page }, ti) => {
   await skipOnboard(page);
+  await openMarket(page);
   await page.goto("/");
   await claim(page);
-  await page.screenshot({ path: shot("m03b-daily-home", ti.project.name), fullPage: true });
+  await expect(page.getByTestId("session-status")).toContainText("Session open");
+  await expect(page.getByTestId("mode-daily")).toBeVisible();
+  await page.screenshot({ path: shot("m03b-exchange-open", ti.project.name), fullPage: true });
+});
+
+test("m03b-exchange-closed", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.clock.setFixedTime(new Date("2026-08-05T22:00:00Z"));
+  await page.goto("/");
+  await claim(page);
+  await expect(page.getByTestId("market-closed")).toBeVisible();
+  await expect(page.getByTestId("mode-daily")).toHaveCount(0);
+  await expect(page.getByTestId("mode-misere")).toBeVisible(); // practice stays open
+  await page.screenshot({ path: shot("m03b-exchange-closed", ti.project.name), fullPage: true });
 });
 
 test("m04-eris-midgame and comp verdict", async ({ page }, ti) => {
