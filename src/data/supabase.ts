@@ -55,6 +55,15 @@ if (!configured) {
 export const isLive = configured;
 export const backend = () => (isLive ? new URL(url!).host : "local fallback");
 
+/**
+ * Length + last six characters of the key this BUILD is using. Publishable keys
+ * are not secrets (RLS is the control), and without this a wrong value in a
+ * hosting dashboard can only be diagnosed by guesswork. Compare against the
+ * value in the Supabase dashboard: a mismatch means the env var is mangled.
+ */
+export const keyFingerprint = () =>
+  anon ? `len ${anon.length} …${anon.slice(-6)}` : "absent";
+
 let sbPromise: Promise<SupabaseClient> | null = null;
 const getSb = (): Promise<SupabaseClient> | null => {
   if (!isLive) return null;

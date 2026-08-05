@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { backend, claimHandle, describeError, isLive } from "../data/supabase";
+import { backend, claimHandle, describeError, isLive, keyFingerprint } from "../data/supabase";
 import {
   cryptoAvailable, HANDLE_RE, InsecureContextError, newSecret, sanitizeHandle,
   saveIdentity, sha256Hex, type Identity,
@@ -96,6 +96,7 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
       <p data-testid="backend" className="font-mono text-[10px] uppercase tracking-widest text-muted">
         registry: {backend()}
         {!isLive && " (scores stay on this device)"}
+        {isLive && ` · key ${keyFingerprint()}`}
       </p>
     </div>
   );
