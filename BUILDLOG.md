@@ -387,3 +387,32 @@ normal flow order.
 **Verification:** 42 unit tests (new: reflection at both walls including moves larger than the
 range, exactly one warned news event inside [18,28] with magnitude 40-80, no booked fill ever
 further than BUST from V, solo quote legality fuzz), dummy 13 rows / 0 failures, 34 screenshots.
+
+## Retune follow-ups from live play
+
+**Typed quote entry.** With a 0-1000 range, stepping to a target is hopeless — prices are now
+editable fields (native numeric input, so phones raise the number pad; commit on blur/Enter;
+engine snaps to grid, holds the spread floor by pushing the other side, clamps to the band).
+First implementation was a controlled React input and it had a real bug: programmatic input
+(test drivers, autofill keyboards) raced the draft state and interleaved old and new digits —
+typing 300 into a field showing 250 produced 250300, which clamped to the band edge and looked
+like the input "jumping". Rewritten uncontrolled: the DOM owns the text, the engine owns the
+number. E2E types through the real UI on both viewports.
+
+**News banner.** The HEADLINE CROSSES warning was one red line in a scrolling tape and the
+player missed it in live play. It is now also a full-width red banner above the quote panel,
+rendered only on the warning tick, so it reveals nothing early. (User-approved UI addition
+beyond the original "stepper and modal copy only" constraint.)
+
+**Dominant-strategy regression.** Live play on a stale build resurfaced the 1000-level
+version's exploit: park both quotes at the band edge at the spread floor and farm fills with no
+inference. A dedicated regression now pins it dead: over 150 seeded games the edge-camper's
+prints are mostly voided by the bust rule (busts > booked fills) and a Bayesian player on the
+SAME seeds destroys more than 2x the camper's total. 46 unit tests green.
+
+**Stale-build trap, again.** The screenshot that surfaced all this showed fair value above
+1000 — impossible in the new engine; it was the OLD build served from the service worker's
+cache (or the still-deployed old version). SW cache bumped to md-v3 so the next deploy purges.
+Standing lesson recorded the first time this happened; it happened again anyway because the
+bump is manual. ponytail: cache name is hand-bumped; derive it from the build hash if this
+bites a third time.

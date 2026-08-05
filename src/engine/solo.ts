@@ -97,6 +97,24 @@ export function adjust(s: SoloState, which: "bid" | "ask", d: number): void {
   [s.bid, s.ask] = clampSolo(bid, ask, s.anchor);
 }
 
+/**
+ * Set one side outright. Typing is the only sane way to move across a 0-1000
+ * range, so this pushes the OTHER side to keep the spread floor rather than
+ * rejecting the entry the way the delta stepper does.
+ */
+export function setQuote(s: SoloState, which: "bid" | "ask", v: number): void {
+  if (!Number.isFinite(v)) return;
+  let bid = s.bid, ask = s.ask;
+  if (which === "bid") {
+    bid = r2(v);
+    if (ask - bid < MIN_SPREAD) ask = bid + MIN_SPREAD;
+  } else {
+    ask = r2(v);
+    if (ask - bid < MIN_SPREAD) bid = ask - MIN_SPREAD;
+  }
+  [s.bid, s.ask] = clampSolo(bid, ask, s.anchor);
+}
+
 export function skew(s: SoloState, d: number): void {
   [s.bid, s.ask] = clampSolo(s.bid + d, s.ask + d, s.anchor);
 }

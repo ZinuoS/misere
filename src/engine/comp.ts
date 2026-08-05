@@ -50,6 +50,20 @@ export function adjustDesk(s: CompState, i: number, which: "bid" | "ask", d: num
   [pl.bid, pl.ask] = clampMkt(bid, ask, s.anchor);
 }
 
+export function setDeskQuote(s: CompState, i: number, which: "bid" | "ask", v: number): void {
+  if (!Number.isFinite(v)) return;
+  const pl = s.desks[i];
+  let bid = pl.bid, ask = pl.ask;
+  if (which === "bid") {
+    bid = r2(v);
+    if (ask - bid < MIN_SPREAD) ask = bid + MIN_SPREAD;
+  } else {
+    ask = r2(v);
+    if (ask - bid < MIN_SPREAD) bid = ask - MIN_SPREAD;
+  }
+  [pl.bid, pl.ask] = clampMkt(bid, ask, s.anchor);
+}
+
 export function skewDesk(s: CompState, i: number, d: number): void {
   const pl = s.desks[i];
   [pl.bid, pl.ask] = clampMkt(pl.bid + d, pl.ask + d, s.anchor);

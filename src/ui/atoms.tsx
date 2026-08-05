@@ -57,6 +57,40 @@ export const QBtn = ({ step, dir, children, tone, testid }: {
   );
 };
 
+/**
+ * Editable price. Fair value ranges over 0-1000, so stepping to a target is
+ * hopeless — you type it. Kept as a native numeric input so phones raise the
+ * number pad; commits on blur or Enter, snapping and clamping in the engine.
+ */
+export const PriceCell = ({ value, onSet, tone, testid, readOnly }: {
+  value: number; onSet?: (v: number) => void; tone: string; testid: string; readOnly?: boolean;
+}) => {
+  if (readOnly || !onSet) {
+    return <span className="font-mono text-2xl" style={{ color: tone }}>{price(value)}</span>;
+  }
+  // Uncontrolled on purpose: a controlled draft races programmatic input
+  // (autofill, test drivers) and can interleave old and new digits. The DOM
+  // owns the text; the engine owns the number; key= remounts on engine change.
+  return (
+    <input
+      key={value}
+      data-testid={testid}
+      inputMode="decimal"
+      defaultValue={price(value)}
+      onFocus={(e) => { e.currentTarget.value = String(value); e.currentTarget.select(); }}
+      onBlur={(e) => {
+        const raw = e.currentTarget.value.replace(/[^\d.]/g, "");
+        const v = Number(raw);
+        if (raw.trim() !== "" && Number.isFinite(v)) onSet(v);
+        e.currentTarget.value = price(value); // restore display if nothing changed
+      }}
+      onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      className="w-28 rounded-md border border-transparent bg-transparent text-center font-mono text-2xl outline-none focus:border-hair focus:bg-panel2"
+      style={{ color: tone }}
+    />
+  );
+};
+
 export const BigBtn = ({ onClick, children, subtle, testid }: {
   onClick: () => void; children: ReactNode; subtle?: boolean; testid?: string;
 }) => (
@@ -75,10 +109,11 @@ export const Panel = ({ children, className = "" }: { children: ReactNode; class
   <div className={`rounded-lg border border-hair bg-panel ${className}`}>{children}</div>
 );
 
-export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, accent }: {
+export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, onSet, readOnly, accent }: {
   title: string; bid: number; ask: number; ref_: number | null;
   onAdj?: (which: "bid" | "ask", d: number) => void;
   onSkew?: (d: number) => void;
+  onSet?: (which: "bid" | "ask", v: number) => void;
   readOnly?: boolean; accent: string;
 }) {
   return (
@@ -91,7 +126,7 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
       </div>
       <div className="flex items-center justify-between">
         <div className="flex flex-col items-center gap-2">
-          <span className="font-mono text-2xl text-bid">{price(bid)}</span>
+          <PriceCell value={bid} onSet={(v) => onSet?.("bid", v)} tone="var(--bid)" testid="bid-input" readOnly={readOnly} />
           {!readOnly && (
             <div className="flex gap-2">
               <QBtn tone="var(--bid)" dir={-1} step={(d) => onAdj!("bid", d)} testid="bid-down">&minus;</QBtn>
@@ -116,7 +151,7 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
           )}
         </div>
         <div className="flex flex-col items-center gap-2">
-          <span className="font-mono text-2xl text-ask">{price(ask)}</span>
+          <PriceCell value={ask} onSet={(v) => onSet?.("ask", v)} tone="var(--ask)" testid="ask-input" readOnly={readOnly} />
           {!readOnly && (
             <div className="flex gap-2">
               <QBtn tone="var(--ask)" dir={-1} step={(d) => onAdj!("ask", d)} testid="ask-down">&minus;</QBtn>

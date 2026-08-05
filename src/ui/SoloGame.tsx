@@ -1,7 +1,7 @@
 import { useReducer, useRef } from "react";
 import { mulberry32 } from "../engine/rng";
 import {
-  adjust, skew, soloInit, soloStep, soloTruePnl, type SoloState,
+  adjust, setQuote, skew, soloInit, soloStep, soloTruePnl, type SoloState,
 } from "../engine/solo";
 import { decompose, residual } from "../engine/decompose";
 import { INV_CAP, SOLO_T, V_MID, type Rng } from "../engine/types";
@@ -71,11 +71,23 @@ export function SoloGame({ mode, seed, daily, dailyShare, onStats, onExit, repor
             <Stat label="Position" value={(s.inv > 0 ? "+" : "") + s.inv} color={Math.abs(s.inv) >= INV_CAP ? "var(--red)" : "var(--ink)"} />
             <Stat label="Tick" value={`${s.t}/${SOLO_T}`} />
           </div>
+          {s.t === s.newsTick - 1 && (
+            <div
+              data-testid="news-banner"
+              className="rounded-lg border-2 border-red bg-red p-3 text-center font-display text-lg font-black uppercase tracking-tight text-paper"
+            >
+              Headline crosses — brace
+              <div className="font-mono text-xs font-normal normal-case tracking-widest">
+                fair value moves hard next tick
+              </div>
+            </div>
+          )}
           <QuotePanel
             title={daily ? "The daily (lose)" : misere ? "Your market (lose)" : "Your market (make)"}
             bid={s.bid} ask={s.ask} ref_={s.lastRef}
             onAdj={(w, d) => { adjust(s, w, d); force(); }}
             onSkew={(d) => { skew(s, d); force(); }}
+            onSet={(w, v) => { setQuote(s, w, v); force(); }}
             accent="var(--gold)"
           />
           <BigBtn onClick={doStep} testid="tick">Post quotes &rarr; next tick</BigBtn>

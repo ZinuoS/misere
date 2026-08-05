@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useReducer, useRef } from "react";
 import { mulberry32 } from "../engine/rng";
 import {
-  adjustDesk, compInit, compStep, deskPnl, skewDesk, type CompState,
+  adjustDesk, compInit, compStep, deskPnl, setDeskQuote, skewDesk, type CompState,
 } from "../engine/comp";
 import { decompose } from "../engine/decompose";
 import { COMP_T, type Rng } from "../engine/types";
@@ -85,7 +85,8 @@ export function CompGame({ vsBot, seed, onExit, report }: {
             <>
               <QuotePanel title="Your market" bid={s.desks[0].bid} ask={s.desks[0].ask} ref_={s.lastRef}
                 onAdj={(w, d) => { adjustDesk(s, 0, w, d); force(); }}
-                onSkew={(d) => { skewDesk(s, 0, d); force(); }} accent={ACCENTS[0]} />
+                onSkew={(d) => { skewDesk(s, 0, d); force(); }}
+                onSet={(w, v) => { setDeskQuote(s, 0, w, v); force(); }} accent={ACCENTS[0]} />
               <QuotePanel title={`ERIS — inv ${s.desks[1].inv > 0 ? "+" : ""}${s.desks[1].inv}`}
                 bid={s.desks[1].bid} ask={s.desks[1].ask} ref_={s.lastRef} readOnly accent={ACCENTS[1]} />
               <BigBtn onClick={resolve} testid="tick">Post quotes &rarr; next tick</BigBtn>
@@ -95,7 +96,8 @@ export function CompGame({ vsBot, seed, onExit, report }: {
               <QuotePanel title={`${s.desks[hand.adjusting].name} — your turn`}
                 bid={s.desks[hand.adjusting].bid} ask={s.desks[hand.adjusting].ask} ref_={s.lastRef}
                 onAdj={(w, d) => { adjustDesk(s, hand.adjusting, w, d); force(); }}
-                onSkew={(d) => { skewDesk(s, hand.adjusting, d); force(); }} accent={ACCENTS[hand.adjusting]} />
+                onSkew={(d) => { skewDesk(s, hand.adjusting, d); force(); }}
+                onSet={(w, v) => { setDeskQuote(s, hand.adjusting, w, v); force(); }} accent={ACCENTS[hand.adjusting]} />
               <QuotePanel title={`${s.desks[1 - hand.adjusting].name}${hand.confirmed[1 - hand.adjusting] ? " — locked" : ""}`}
                 bid={s.desks[1 - hand.adjusting].bid} ask={s.desks[1 - hand.adjusting].ask} ref_={s.lastRef}
                 readOnly accent={ACCENTS[1 - hand.adjusting]} />

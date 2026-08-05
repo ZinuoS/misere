@@ -1,7 +1,7 @@
 // Offline shell: network-first navigations with cached fallback, cache-first assets.
 // Bump on every release that changes the shell: activate purges every other
 // cache, so a stale deploy cannot keep serving old chunks.
-const CACHE = "md-v2";
+const CACHE = "md-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 

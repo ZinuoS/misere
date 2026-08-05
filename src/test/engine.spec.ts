@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { dateSeed, mulberry32 } from "../engine/rng";
-import { clampMkt, clampSolo, skew, soloInit, soloStep, soloTruePnl } from "../engine/solo";
+import { clampMkt, clampSolo, setQuote, skew, soloInit, soloStep, soloTruePnl } from "../engine/solo";
 import {
   compInit, compStep, deskPnl, routeBuy, routeSell, skewDesk, type Desk,
 } from "../engine/comp";
@@ -10,6 +10,7 @@ import {
   COMP_BAND as BAND, COMP_START as START, INV_CAP, MIN_SPREAD, TICK, TUNE, V_MAX, V_MIN, r2, reflect,
 } from "../engine/types";
 import { act, POLICIES } from "./dummy";
+import { makeBot } from "./bots";
 
 const EPS = 1e-9;
 
@@ -269,5 +270,79 @@ describe("solo quote band", () => {
       expect(b).toBe(r2(b));
       expect(a).toBe(r2(a));
     }
+  });
+});
+
+describe("typed quote entry", () => {
+  it("sets a side outright, snaps to the grid and holds the spread floor", () => {
+    const s = soloInit(mulberry32(3));
+    setQuote(s, "ask", 612);          // off-grid, inside the band
+    expect(s.ask).toBe(610);          // snapped to TICK
+    setQuote(s, "bid", 300);
+    expect(s.bid).toBe(300);
+    expect(s.ask - s.bid).toBeGreaterThanOrEqual(MIN_SPREAD);
+    // typing past the band is clamped to it, not rejected: at the open the
+    // anchor is V_MID, so the reachable window is 250..750
+    setQuote(s, "ask", 812);
+    expect(s.ask).toBe(750);
+  });
+
+  it("pushes the other side instead of rejecting a crossing entry", () => {
+    const s = soloInit(mulberry32(3));
+    setQuote(s, "bid", 300);
+    setQuote(s, "ask", 305);
+    // the stepper would refuse this; typing must still leave a legal market
+    expect(s.ask - s.bid).toBeGreaterThanOrEqual(MIN_SPREAD);
+    setQuote(s, "ask", 700);
+    setQuote(s, "bid", 699);
+    expect(s.ask - s.bid).toBeGreaterThanOrEqual(MIN_SPREAD);
+  });
+
+  it("ignores junk and clamps out-of-range entries", () => {
+    const s = soloInit(mulberry32(3));
+    const before = [s.bid, s.ask];
+    setQuote(s, "bid", NaN);
+    expect([s.bid, s.ask]).toEqual(before);
+    setQuote(s, "ask", 99999);
+    expect(s.ask).toBeLessThanOrEqual(V_MAX);
+    setQuote(s, "bid", -500);
+    expect(s.bid).toBeGreaterThanOrEqual(V_MIN);
+    expect(s.ask - s.bid).toBeGreaterThanOrEqual(MIN_SPREAD);
+  });
+});
+
+describe("dominant-strategy regression (the exploit from the 1000-level version)", () => {
+  // The original retune had a visible dominant strategy: park both quotes at the
+  // band edge at the spread floor and farm fills forever — no inference needed.
+  // Under the bust rule that play must (a) mostly produce voided prints and
+  // (b) score far below an inference player on the same seeds.
+  it("edge camping is busted, not rewarded", () => {
+    const N = 150;
+    let camperTotal = 0, bayesTotal = 0, busts = 0, booked = 0;
+    for (let seed = 1; seed <= N; seed++) {
+      // camper: lowest legal market every tick
+      const rngC = mulberry32(seed);
+      const c = soloInit(rngC);
+      while (!c.done) {
+        [c.bid, c.ask] = clampSolo(V_MIN, V_MIN + MIN_SPREAD, c.anchor);
+        soloStep(c, rngC);
+        if (c.tape.some((e) => e.t === c.t && e.text.startsWith("Trade busted"))) busts++;
+      }
+      booked += c.fills.length;
+      camperTotal += -soloTruePnl(c);
+
+      // inference player, same seeds
+      const rngB = mulberry32(seed);
+      const b = soloInit(rngB);
+      const bot = makeBot("BAYES", "misere");
+      while (!b.done) {
+        bot.quote(b, rngB);
+        soloStep(b, rngB);
+        bot.observe?.(b);
+      }
+      bayesTotal += -soloTruePnl(b);
+    }
+    expect(busts).toBeGreaterThan(booked); // the edge mostly produces voided prints
+    expect(bayesTotal).toBeGreaterThan(2 * camperTotal); // knowing V is worth >2x parking blind
   });
 });

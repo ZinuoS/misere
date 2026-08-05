@@ -186,6 +186,7 @@ test("m07-headline-crosses", async ({ page }, ti) => {
   // seed 1 puts the news at tick 18, so the warning lands on tick 17
   await start(page, 1, "mode-misere");
   for (let i = 0; i < 17; i++) await page.getByTestId("tick").click();
+  await expect(page.getByTestId("news-banner")).toBeVisible();
   await expect(page.getByTestId("tape")).toContainText("HEADLINE CROSSES");
   await page.screenshot({ path: shot("m07-headline-crosses", ti.project.name), fullPage: true });
 });
@@ -200,4 +201,16 @@ test("m07-midgame-tightened and verdict", async ({ page }, ti) => {
   for (let i = 0; i < 26; i++) await page.getByTestId("tick").click();
   await expect(page.getByTestId("verdict")).toBeVisible();
   await page.screenshot({ path: shot("m07-verdict", ti.project.name), fullPage: true });
+});
+
+test("m07-typed-quote", async ({ page }, ti) => {
+  await start(page, 1, "mode-misere");
+  // typing is the only sane way to cross a 0-1000 range
+  await page.getByTestId("bid-input").fill("300");
+  await page.getByTestId("bid-input").press("Enter");
+  await page.getByTestId("ask-input").fill("340");
+  await page.getByTestId("ask-input").press("Enter");
+  await expect(page.getByTestId("bid-input")).toHaveValue("300.00");
+  await expect(page.getByTestId("ask-input")).toHaveValue("340.00");
+  await page.screenshot({ path: shot("m07-typed-quote", ti.project.name), fullPage: true });
 });
