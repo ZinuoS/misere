@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+/* palette tokens — inverted semantics: losses gold (celebrated), profits red (shameful) */
+:root {
+  --ink: #0b0e14;
+  --panel: #141926;
+  --panel2: #1b2233;
+  --bone: #e7e2d5;
+  --muted: #8a93a6;
+  --gold: #e8b84b;
+  --red: #e4573d;
+  --bid: #7fa8c9;
+  --ask: #c98a7f;
+  --hair: #252d40;
+  --p2: #8fb6a6;
+}
+
+@theme {
+  --color-ink: var(--ink);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel2);
+  --color-bone: var(--bone);
+  --color-muted: var(--muted);
+  --color-gold: var(--gold);
+  --color-red: var(--red);
+  --color-bid: var(--bid);
+  --color-ask: var(--ask);
+  --color-hair: var(--hair);
+  --color-p2: var(--p2);
+  --font-display: "Anton", "Arial Narrow", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "Archivo", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--font-sans);
+}
+
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* marquee ticker */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marquee 30s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
