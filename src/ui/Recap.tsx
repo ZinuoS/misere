@@ -9,6 +9,31 @@ import { verdict } from "./verdicts";
 
 const Chart = lazy(() => import("./Chart"));
 
+// Personal-best flourish: red candlestick glyphs rain for two seconds.
+// prefers-reduced-motion is honoured in CSS (.candle is display:none there).
+function CandleRain() {
+  const drops = Array.from({ length: 28 }, (_, i) => ({
+    left: (i * 37) % 100,
+    delay: (i % 7) * 0.12,
+    dur: 1.1 + ((i * 13) % 7) / 10,
+  }));
+  return (
+    <div data-testid="candle-rain" aria-hidden>
+      {drops.map((d, i) => (
+        <span
+          key={i}
+          className="candle"
+          style={{ left: `${d.left}%`, animationDelay: `${d.delay}s`, animationDuration: `${d.dur}s` }}
+        >
+          ┃
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const BEST_KEY = "md:best:misere";
+
 function DailyShareBlock({ result, dec, onStats }: {
   result: DailyResult; dec: Decomposition; onStats: () => void;
 }) {
@@ -65,8 +90,21 @@ export function Recap({ s, mode, dailyShare, onStats }: {
   );
   const achieved = score > 0;
 
+  // new personal best in misère => rain candles for two seconds
+  const [rain, setRain] = useState(false);
+  useEffect(() => {
+    if (!misere || score <= 0) return;
+    const prev = Number(localStorage.getItem(BEST_KEY) ?? "-Infinity");
+    if (!(score > prev)) return;
+    localStorage.setItem(BEST_KEY, String(score));
+    setRain(true);
+    const id = setTimeout(() => setRain(false), 2000);
+    return () => clearTimeout(id);
+  }, [misere, score]);
+
   return (
     <div className="flex flex-col gap-4">
+      {rain && <CandleRain />}
       <div data-testid="verdict" className="relative overflow-hidden rounded-lg border border-hair bg-panel">
         <div className="newsprint max-h-56">
           <img src={v.img} alt="" width={v.w} height={v.h} />

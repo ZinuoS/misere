@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { claimHandle } from "../data/supabase";
-import { HANDLE_RE, newSecret, saveIdentity, sha256Hex, type Identity } from "../data/identity";
+import {
+  cryptoAvailable, HANDLE_RE, InsecureContextError, newSecret, sanitizeHandle,
+  saveIdentity, sha256Hex, type Identity,
+} from "../data/identity";
 
 export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
   const [v, setV] = useState("");
-  const [state, setState] = useState<"idle" | "busy" | "taken" | "invalid" | "error">("idle");
+  const [state, setState] = useState<"idle" | "busy" | "taken" | "invalid" | "error" | "insecure">(
+    cryptoAvailable() ? "idle" : "insecure",
+  );
 
   const claim = async () => {
     if (!HANDLE_RE.test(v)) return setState("invalid");
@@ -16,8 +21,8 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
       const id = { handle: v, secret };
       saveIdentity(id);
       onClaimed(id);
-    } catch {
-      setState("error");
+    } catch (e) {
+      setState(e instanceof InsecureContextError ? "insecure" : "error");
     }
   };
 
@@ -33,13 +38,21 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
       </p>
       <input
         value={v}
-        onChange={(e) => { setV(e.target.value); setState("idle"); }}
+        onChange={(e) => {
+          setV(sanitizeHandle(e.target.value));
+          setState(cryptoAvailable() ? "idle" : "insecure");
+        }}
         onKeyDown={(e) => e.key === "Enter" && claim()}
         placeholder="3-16 chars: letters, digits, _ -"
         data-testid="gate-input"
         className="w-full rounded-md border border-hair bg-paper px-3 py-3 font-mono text-base outline-none focus:border-ink"
         maxLength={16}
-        autoFocus
+        autoCapitalize="none"
+        autoCorrect="off"
+        autoComplete="off"
+        spellCheck={false}
+        inputMode="text"
+        enterKeyHint="go"
       />
       {state === "taken" && (
         <p data-testid="gate-error" className="font-mono text-xs uppercase tracking-widest text-red">
@@ -56,9 +69,15 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
           The registry is unreachable. Try again.
         </p>
       )}
+      {state === "insecure" && (
+        <p data-testid="gate-error" className="text-xs leading-relaxed text-red">
+          This page is served over plain http, so the browser withholds the crypto needed to
+          mint your device secret. Open it over https, or on localhost.
+        </p>
+      )}
       <button
         onClick={claim}
-        disabled={state === "busy"}
+        disabled={state === "busy" || state === "insecure"}
         data-testid="gate-claim"
         className="w-full rounded-full bg-ink py-3.5 font-mono text-sm uppercase tracking-widest text-paper disabled:opacity-50"
       >

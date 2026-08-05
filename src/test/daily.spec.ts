@@ -119,3 +119,14 @@ describe("verdict ladder", () => {
     expect(verdict("misere", 0, dec({ nFills: 0 })).stamp).toBeUndefined();
   });
 });
+
+describe("handle sanitizing (mobile keyboards)", () => {
+  it("strips what iOS adds and keeps a valid handle valid", async () => {
+    const { sanitizeHandle, HANDLE_RE } = await import("../data/identity");
+    expect(sanitizeHandle("Zinuo Shi ")).toBe("ZinuoShi");
+    expect(sanitizeHandle("desk’s—name.")).toBe("desksname"); // smart quote, em dash, period
+    expect(HANDLE_RE.test(sanitizeHandle("Zinuo Shi "))).toBe(true);
+    expect(sanitizeHandle("a".repeat(30))).toHaveLength(16);
+    expect(sanitizeHandle("keep_me-99")).toBe("keep_me-99");
+  });
+});

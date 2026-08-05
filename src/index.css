@@ -92,6 +92,23 @@ body {
   transform-origin: top;
 }
 
+/* candle rain — personal-best flourish on the misère verdict, 2s then gone */
+@keyframes candlefall {
+  from { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  to { transform: translateY(105vh) rotate(20deg); opacity: 0; }
+}
+.candle {
+  position: fixed;
+  top: 0;
+  color: var(--red);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 1;
+  animation: candlefall linear forwards;
+  z-index: 60;
+  pointer-events: none;
+}
+
 /* marquee ticker */
 @keyframes marquee {
   from { transform: translateX(0); }
@@ -105,4 +122,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .marquee-track { animation: none; }
   .flip-new { animation: none; }
+  .candle { display: none; }
 }

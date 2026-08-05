@@ -27,6 +27,27 @@ Telemetry per game: pnl, sharp edge, noise edge, inventory pnl, fills, sharp fil
 avg spread, avg skew, duration. Decomposition identity `pnl = sharp + noise + inventory`
 is enforced by unit test and dev-build runtime assertion.
 
+## Running it
+
+```bash
+npm install
+cp .env.example .env.local   # fill in a Supabase project, or leave it out entirely
+npm run dev
+```
+
+Without Supabase credentials the app runs on a localStorage fallback registry with
+identical call shapes — handles, leaderboard and telemetry are per-browser. Add the
+two env vars and run `supabase/migrations/0001_init.sql` in the project's SQL editor
+to go live; no code changes.
+
+Note: claiming a handle needs `crypto.subtle`, which browsers expose only in a secure
+context. Use `localhost` or https — a plain-http LAN address will refuse the claim and
+say so.
+
+Scripts: `test` (Vitest), `dummy` (headless dummy player over every mode), `calibrate`
+(1,000-game tier-band calibration), `shots` (Playwright screenshots), `e2e` (all-mode
+smoke through the real UI).
+
 ## Stack
 
 Vite + React 18 + TypeScript + Tailwind. Pure seeded engine (`src/engine/`, zero React

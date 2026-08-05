@@ -94,4 +94,9 @@ export function shareCard(
   ].join("\n");
 }
 
-export const SITE_URL = "https://misere-desk.vercel.app";
+// The share card's last line. Uses the real origin once deployed, so the card
+// always points at wherever this build is actually served from.
+export const SITE_URL =
+  typeof window !== "undefined" && window.location.origin.startsWith("http")
+    ? window.location.origin
+    : "https://misere.vercel.app";

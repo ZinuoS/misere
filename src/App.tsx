@@ -195,7 +195,10 @@ export default function App() {
         )}
 
         <footer className="pb-4 pt-8 text-center text-xs text-muted">
-          Glosten&ndash;Milgrom, sign flipped. The filter is the same; only the control changes.
+          <p>Glosten&ndash;Milgrom, sign flipped. The filter is the same; only the control changes.</p>
+          <p className="mt-2 font-mono uppercase tracking-widest">
+            &copy; {new Date().getUTCFullYear()} Zinuo Shi
+          </p>
         </footer>
       </div>
 
