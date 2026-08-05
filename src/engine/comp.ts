@@ -1,5 +1,6 @@
 import {
-  COMP_T, INV_CAP, MIN_SPREAD, NOISE_SIGMA, P_INFORMED, PRINT_PROB, PRINT_SIGMA, START,
+  COMP_PRINT_PROB as PRINT_PROB, COMP_PRINT_SIGMA as PRINT_SIGMA, COMP_START as START,
+  COMP_T, INV_CAP, MIN_SPREAD, NOISE_SIGMA, P_INFORMED,
   r2, type Fill, type QuoteRec, type Rng, type Side, type StepOpts, type TapeEntry,
 } from "./types";
 import { randn } from "./rng";

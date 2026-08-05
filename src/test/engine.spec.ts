@@ -1,12 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { dateSeed, mulberry32 } from "../engine/rng";
-import { clampMkt, soloInit, soloStep, soloTruePnl } from "../engine/solo";
+import { clampMkt, clampSolo, skew, soloInit, soloStep, soloTruePnl } from "../engine/solo";
 import {
   compInit, compStep, deskPnl, routeBuy, routeSell, skewDesk, type Desk,
 } from "../engine/comp";
 import { erisQuotes } from "../engine/eris";
 import { decompose, residual } from "../engine/decompose";
-import { BAND, INV_CAP, MIN_SPREAD, START, TICK, r2 } from "../engine/types";
+import {
+  COMP_BAND as BAND, COMP_START as START, INV_CAP, MIN_SPREAD, TICK, TUNE, V_MAX, V_MIN, r2, reflect,
+} from "../engine/types";
 import { act, POLICIES } from "./dummy";
 
 const EPS = 1e-9;
@@ -17,7 +19,7 @@ describe("decomposition identity", () => {
       // misere and normal share the engine; distinct seed ranges stand in for the modes
       for (let seed = modeSeedBase; seed < modeSeedBase + 500; seed++) {
         const rng = mulberry32(seed);
-        const s = soloInit();
+        const s = soloInit(rng);
         while (!s.done) {
           act("random-legal", s, rng);
           soloStep(s, rng);
@@ -66,7 +68,7 @@ describe("inventory cap", () => {
     for (let seed = 0; seed < 100; seed++) {
       for (const policy of POLICIES) {
         const rng = mulberry32(seed);
-        const s = soloInit();
+        const s = soloInit(rng);
         while (!s.done) {
           act(policy, s, rng);
           soloStep(s, rng);
@@ -119,16 +121,22 @@ describe("NBBO routing", () => {
 
 describe("tape-painting regression", () => {
   it("player's own fills never move the anchor (zero exogenous prints)", () => {
-    // Always-max-skew camps at the band top; with no prints, noise sellers hit
-    // the inflated bid over and over. The anchor must stay bit-identical.
-    const rng = mulberry32(11);
-    const s = soloInit();
+    // Needs a seed whose fair value sits near the opening anchor, so quotes camped
+    // on the anchor actually trade and stand (a busted print books nothing).
+    let seed = 1;
+    for (; seed < 5000; seed++) {
+      const probe = soloInit(mulberry32(seed));
+      if (Math.abs(probe.V - probe.anchor) < 30) break;
+    }
+    const rng = mulberry32(seed);
+    const s = soloInit(rng);
     const anchorBefore = s.anchor;
     while (!s.done) {
-      act("always-max-skew", s, rng);
+      // camp at the spread floor on the anchor: repeated self-fills, no prints
+      [s.bid, s.ask] = clampSolo(r2(s.anchor) - MIN_SPREAD, r2(s.anchor) + MIN_SPREAD, s.anchor);
       soloStep(s, rng, { printProb: 0 });
     }
-    expect(s.fills.filter((f) => f.side === "sell").length).toBeGreaterThan(5);
+    expect(s.fills.length).toBeGreaterThan(5);
     expect(Object.is(s.anchor, anchorBefore)).toBe(true);
   });
 });
@@ -137,7 +145,7 @@ describe("daily determinism", () => {
   it("two engine instances from the same date-seed produce bit-identical tapes", () => {
     const run = () => {
       const rng = mulberry32(dateSeed("2026-08-04"));
-      const s = soloInit();
+      const s = soloInit(rng);
       while (!s.done) {
         act("random-legal", s, rng);
         soloStep(s, rng);
@@ -151,7 +159,7 @@ describe("daily determinism", () => {
     expect(dateSeed("2026-08-04")).not.toBe(dateSeed("2026-08-05"));
     const tape = (iso: string) => {
       const rng = mulberry32(dateSeed(iso));
-      const s = soloInit();
+      const s = soloInit(rng);
       while (!s.done) soloStep(s, rng);
       return JSON.stringify(s.vPath);
     };
@@ -181,5 +189,85 @@ describe("ERIS", () => {
     const short = { est: START, side: "low" as const };
     erisQuotes(short, -(INV_CAP - 2), START, noFlip);
     expect(short.side).toBe("high");
+  });
+});
+
+describe("reflecting barriers", () => {
+  it("folds overshoot back inside at both walls", () => {
+    expect(reflect(-30)).toBe(30);          // below the floor
+    expect(reflect(1030)).toBe(970);        // above the ceiling
+    expect(reflect(0)).toBe(0);
+    expect(reflect(1000)).toBe(1000);
+    expect(reflect(437.5)).toBe(437.5);     // untouched inside
+  });
+
+  it("never leaves the range over a full game, including the news event", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rng = mulberry32(seed);
+      const s = soloInit(rng);
+      while (!s.done) soloStep(s, rng);
+      for (const v of s.vPath) {
+        expect(v).toBeGreaterThanOrEqual(V_MIN);
+        expect(v).toBeLessThanOrEqual(V_MAX);
+      }
+    }
+  });
+
+  it("reflects even when a move is larger than the whole range", () => {
+    expect(reflect(2500)).toBeGreaterThanOrEqual(V_MIN);
+    expect(reflect(2500)).toBeLessThanOrEqual(V_MAX);
+    expect(reflect(-2500)).toBeGreaterThanOrEqual(V_MIN);
+  });
+});
+
+describe("news event", () => {
+  it("lands once, inside the window, and is warned one tick ahead", () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const rng = mulberry32(seed);
+      const s = soloInit(rng);
+      expect(s.newsTick).toBeGreaterThanOrEqual(18);
+      expect(s.newsTick).toBeLessThanOrEqual(28);
+      expect(Math.abs(s.newsSize)).toBeGreaterThanOrEqual(40);
+      expect(Math.abs(s.newsSize)).toBeLessThanOrEqual(80);
+      const warns: number[] = [];
+      while (!s.done) {
+        soloStep(s, rng);
+        for (const e of s.tape) if (e.text.startsWith("HEADLINE") && !warns.includes(e.t)) warns.push(e.t);
+      }
+      expect(warns).toEqual([s.newsTick - 1]); // exactly one warning, one tick early
+    }
+  });
+});
+
+describe("clearly-erroneous bust rule", () => {
+  it("no booked fill is ever further than BUST from fair value", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rng = mulberry32(seed);
+      const s = soloInit(rng);
+      while (!s.done) {
+        // park at the range edge: the degenerate strategy the rule exists to kill
+        skew(s, 500);
+        soloStep(s, rng);
+      }
+      for (const f of s.fills) {
+        const vAt = s.vPath[f.t];
+        expect(Math.abs(f.price - vAt)).toBeLessThanOrEqual(TUNE.BUST + 1e-9);
+      }
+    }
+  });
+});
+
+describe("solo quote band", () => {
+  it("quotes stay on the grid, above the spread floor and inside the range", () => {
+    const rng = mulberry32(21);
+    for (let i = 0; i < 5000; i++) {
+      const anchor = V_MIN + rng() * (V_MAX - V_MIN);
+      const [b, a] = clampSolo(V_MIN - 500 + rng() * 2000, V_MIN - 500 + rng() * 2000, anchor);
+      expect(a - b).toBeGreaterThanOrEqual(MIN_SPREAD - EPS);
+      expect(b).toBeGreaterThanOrEqual(V_MIN);
+      expect(a).toBeLessThanOrEqual(V_MAX);
+      expect(b).toBe(r2(b));
+      expect(a).toBe(r2(a));
+    }
   });
 });

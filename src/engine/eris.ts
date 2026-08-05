@@ -1,4 +1,4 @@
-import { INV_CAP, MIN_SPREAD, START, type Rng } from "./types";
+import { COMP_START as START, INV_CAP, MIN_SPREAD, type Rng } from "./types";
 import { clampMkt } from "./solo";
 
 export interface ErisState {

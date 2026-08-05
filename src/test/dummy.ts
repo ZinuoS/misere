@@ -48,7 +48,7 @@ export function runSolo(mode: string, policy: Policy, seed: number): DummyRow {
   const row: DummyRow = { mode, policy, ticks: 0, fills: 0, truePnl: 0, residual: 0, error: "" };
   try {
     const rng = mulberry32(seed);
-    const s = soloInit();
+    const s = soloInit(rng);
     while (!s.done) {
       act(policy, s, rng);
       soloStep(s, rng);
@@ -112,7 +112,7 @@ export function runComp(mode: "eris" | "duel", policy: Policy, seed: number): Du
 export function runDaily(seed: number): { row: DummyRow; identical: boolean; secondAccepted: boolean } {
   const play = () => {
     const rng = mulberry32(seed);
-    const s = soloInit();
+    const s = soloInit(rng);
     while (!s.done) {
       act("random-legal", s, rng);
       soloStep(s, rng);

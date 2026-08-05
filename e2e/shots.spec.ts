@@ -173,3 +173,31 @@ test("m05-leaderboard and research", async ({ page }, ti) => {
   await expect(page.getByTestId("research")).toContainText("misere");
   await page.getByTestId("research").screenshot({ path: shot("m05-research", ti.project.name) });
 });
+
+// --- inference-market retune ---
+
+test("m07-opening-wide", async ({ page }, ti) => {
+  await start(page, 1, "mode-misere");
+  await expect(page.getByTestId("tape")).toContainText("somewhere in 0-1000");
+  await page.screenshot({ path: shot("m07-opening-wide", ti.project.name), fullPage: true });
+});
+
+test("m07-headline-crosses", async ({ page }, ti) => {
+  // seed 1 puts the news at tick 18, so the warning lands on tick 17
+  await start(page, 1, "mode-misere");
+  for (let i = 0; i < 17; i++) await page.getByTestId("tick").click();
+  await expect(page.getByTestId("tape")).toContainText("HEADLINE CROSSES");
+  await page.screenshot({ path: shot("m07-headline-crosses", ti.project.name), fullPage: true });
+});
+
+test("m07-midgame-tightened and verdict", async ({ page }, ti) => {
+  await start(page, 1, "mode-misere");
+  // narrow in from the opening 250/750 using the coarse hold, then trade on
+  for (let i = 0; i < 12; i++) await page.getByTestId("bid-up").click();
+  for (let i = 0; i < 12; i++) await page.getByTestId("ask-down").click();
+  for (let i = 0; i < 14; i++) await page.getByTestId("tick").click();
+  await page.screenshot({ path: shot("m07-midgame-tightened", ti.project.name), fullPage: true });
+  for (let i = 0; i < 26; i++) await page.getByTestId("tick").click();
+  await expect(page.getByTestId("verdict")).toBeVisible();
+  await page.screenshot({ path: shot("m07-verdict", ti.project.name), fullPage: true });
+});

@@ -1,28 +1,53 @@
 import {
-  BAND, INV_CAP, JUMP_MIN, JUMP_PROB, JUMP_SPAN, MIN_SPREAD, NOISE_SIGMA, P_INFORMED,
-  PRINT_PROB, PRINT_SIGMA, SOLO_T, START, TICK, V_SIGMA,
-  r2, type Fill, type QuoteRec, type Rng, type Side, type StepOpts, type TapeEntry,
+  COMP_BAND, COMP_JUMP_MIN, COMP_JUMP_PROB, COMP_JUMP_SPAN, COMP_V_SIGMA,
+  INV_CAP, MIN_SPREAD, NEWS_MAX_T, NEWS_MIN, NEWS_MIN_T, NEWS_SPAN, NOISE_SIGMA,
+  P_INFORMED, PRINT_SIGMA, SOLO_T, TUNE, V_MAX, V_MID, V_MIN, V_SIGMA,
+  r2, reflect,
+  type Fill, type QuoteRec, type Rng, type Side, type StepOpts, type TapeEntry,
 } from "./types";
 import { randn } from "./rng";
 
+const round2 = (x: number) => Math.round(x * 100) / 100;
+
+/** Competitive fair value: fast, jumpy, unbounded. Unchanged. */
 export const evolveV = (V: number, rng: Rng) => {
-  let v = V + randn(rng) * V_SIGMA;
-  if (rng() < JUMP_PROB) v += (rng() < 0.5 ? -1 : 1) * (JUMP_MIN + rng() * JUMP_SPAN);
-  return Math.round(v * 100) / 100;
+  let v = V + randn(rng) * COMP_V_SIGMA;
+  if (rng() < COMP_JUMP_PROB) {
+    v += (rng() < 0.5 ? -1 : 1) * (COMP_JUMP_MIN + rng() * COMP_JUMP_SPAN);
+  }
+  return round2(v);
 };
 
-const ceil2 = (x: number) => Math.ceil(x / TICK) * TICK;
-const floor2 = (x: number) => Math.floor(x / TICK) * TICK;
+const ceilT = (x: number) => Math.ceil(x / 5) * 5;
+const floorT = (x: number) => Math.floor(x / 5) * 5;
 
-// Band + spread clamp, anchored to the print-only EWMA (tape-painting patch).
-// Band edges snap inward to the 0.5 grid so rounded quotes can never escape
-// the band or cross — the effective band is up to 0.5 narrower than ±BAND.
+/**
+ * Competitive band clamp, anchored to the print-only EWMA (tape-painting patch).
+ * Solo does NOT use this — see clampSolo.
+ */
 export const clampMkt = (bid: number, ask: number, anchor: number): [number, number] => {
-  const lo = ceil2(anchor - BAND);
-  const hi = floor2(anchor + BAND);
+  const lo = ceilT(anchor - COMP_BAND);
+  const hi = floorT(anchor + COMP_BAND);
   let b = r2(Math.min(Math.max(bid, lo), hi - MIN_SPREAD));
   let a = r2(Math.min(Math.max(ask, lo + MIN_SPREAD), hi));
   if (a - b < MIN_SPREAD) a = b + MIN_SPREAD;
+  return [b, a];
+};
+
+/**
+ * Solo clamp. Quotes live in [V_MIN, V_MAX] and additionally within TUNE.SOLO_BAND
+ * of the public print anchor, so the most you can misprice is bounded by what the
+ * tape has revealed. See TUNE for why that bound has to exist.
+ */
+export const clampSolo = (bid: number, ask: number, anchor = V_MID): [number, number] => {
+  const lo = Math.max(V_MIN, ceilT(anchor - TUNE.SOLO_BAND));
+  const hi = Math.min(V_MAX, floorT(anchor + TUNE.SOLO_BAND));
+  let b = r2(Math.min(Math.max(bid, lo), hi - MIN_SPREAD));
+  let a = r2(Math.min(Math.max(ask, lo + MIN_SPREAD), hi));
+  if (a - b < MIN_SPREAD) {
+    a = b + MIN_SPREAD;
+    if (a > V_MAX) { a = V_MAX; b = V_MAX - MIN_SPREAD; }
+  }
   return [b, a];
 };
 
@@ -31,7 +56,7 @@ export interface SoloState {
   V: number;
   vPath: number[];
   invPath: number[];
-  lastRef: number;
+  lastRef: number | null; // null until the first exogenous print
   anchor: number;
   bid: number;
   ask: number;
@@ -40,40 +65,59 @@ export interface SoloState {
   fills: Fill[];
   quoteLog: QuoteRec[];
   tape: TapeEntry[];
+  newsTick: number;
+  newsSize: number;
   bot: { est: number; cash: number; inv: number }; // honest benchmark bot, same tape
   done: boolean;
 }
 
-export const soloInit = (): SoloState => ({
-  t: 0, V: START, vPath: [START], invPath: [0], lastRef: START, anchor: START,
-  bid: START - MIN_SPREAD / 2, ask: START + MIN_SPREAD / 2, cash: 0, inv: 0,
-  fills: [], quoteLog: [],
-  tape: [{ t: 0, text: `Session open. Reference print ${START.toFixed(2)}.`, kind: "sys" }],
-  bot: { est: START, cash: 0, inv: 0 },
-  done: false,
-});
+/**
+ * Draws V0, the news tick and the news size from the injected PRNG, so a daily
+ * seed pins the entire scenario, not just the drift.
+ */
+export const soloInit = (rng: Rng): SoloState => {
+  const V0 = round2(V_MIN + rng() * (V_MAX - V_MIN));
+  const newsTick = NEWS_MIN_T + Math.floor(rng() * (NEWS_MAX_T - NEWS_MIN_T + 1));
+  const newsSize = (rng() < 0.5 ? -1 : 1) * (NEWS_MIN + rng() * NEWS_SPAN);
+  return {
+    t: 0, V: V0, vPath: [V0], invPath: [0], lastRef: null, anchor: V_MID,
+    bid: 250, ask: 750, cash: 0, inv: 0,
+    fills: [], quoteLog: [],
+    tape: [{ t: 0, text: `Session open. Fair value is somewhere in ${V_MIN}-${V_MAX}.`, kind: "sys" }],
+    newsTick, newsSize,
+    bot: { est: V_MID, cash: 0, inv: 0 },
+    done: false,
+  };
+};
 
 export function adjust(s: SoloState, which: "bid" | "ask", d: number): void {
   let bid = s.bid, ask = s.ask;
   if (which === "bid") bid = r2(bid + d); else ask = r2(ask + d);
   if (ask - bid < MIN_SPREAD - 1e-9) return;
-  [s.bid, s.ask] = clampMkt(bid, ask, s.anchor);
+  [s.bid, s.ask] = clampSolo(bid, ask, s.anchor);
 }
 
 export function skew(s: SoloState, d: number): void {
-  [s.bid, s.ask] = clampMkt(s.bid + d, s.ask + d, s.anchor);
+  [s.bid, s.ask] = clampSolo(s.bid + d, s.ask + d, s.anchor);
 }
 
 export function soloStep(s: SoloState, rng: Rng, opts: StepOpts = {}): void {
   if (s.done) return;
-  const printProb = opts.printProb ?? PRINT_PROB;
+  const printProb = opts.printProb ?? TUNE.PRINT_PROB;
   const t = ++s.t;
-  s.V = evolveV(s.V, rng);
+
+  if (t === s.newsTick - 1) {
+    s.tape.push({ t, text: "HEADLINE CROSSES - BRACE", kind: "sharp" });
+  }
+
+  let v = s.V + randn(rng) * V_SIGMA;
+  if (t === s.newsTick) v += s.newsSize;
+  s.V = reflect(round2(v));
 
   if (rng() < printProb) {
-    const pr = Math.round((s.V + randn(rng) * PRINT_SIGMA) * 100) / 100;
+    const pr = round2(reflect(s.V + randn(rng) * PRINT_SIGMA));
     s.lastRef = pr;
-    s.anchor = 0.6 * s.anchor + 0.4 * pr; // crowd anchors to prints only
+    s.anchor = (1 - TUNE.ANCHOR_W) * s.anchor + TUNE.ANCHOR_W * pr; // crowd anchors to prints only
     s.tape.push({ t, text: `Print elsewhere @ ${pr.toFixed(2)}`, kind: "print" });
     s.bot.est = 0.7 * s.bot.est + 0.3 * pr;
   }
@@ -93,7 +137,10 @@ export function soloStep(s: SoloState, rng: Rng, opts: StepOpts = {}): void {
   };
 
   const f = tryFill(s.bid, s.ask);
-  if (f) {
+  if (f && Math.abs(f.price - s.V) > TUNE.BUST) {
+    // clearly erroneous execution: the print is voided, nobody books anything
+    s.tape.push({ t, text: `Trade busted @ ${f.price.toFixed(2)} - clearly erroneous.`, kind: "sys" });
+  } else if (f) {
     const blocked =
       (f.side === "buy" && s.inv <= -INV_CAP) || (f.side === "sell" && s.inv >= INV_CAP);
     if (blocked) s.tape.push({ t, text: "Inventory cap - quote pulled.", kind: "sys" });
@@ -109,13 +156,18 @@ export function soloStep(s: SoloState, rng: Rng, opts: StepOpts = {}): void {
         kind: informed ? "sharp" : "noise",
       });
     }
-  } else s.tape.push({ t, text: "No interest in your market.", kind: "sys" });
+  } else {
+    // Deliberately does not reveal whether anyone arrived, or of what type:
+    // no-arrival, informed-pass and noise-pass look identical. That ambiguity
+    // is the depth of the game.
+    s.tape.push({ t, text: "A trader looked and walked.", kind: "sys" });
+  }
 
   const bb = r2(s.bot.est - MIN_SPREAD * 0.75), ba = r2(s.bot.est + MIN_SPREAD * 0.75);
   const bf = tryFill(bb, ba);
   if (bf) {
-    if (bf.side === "buy") { s.bot.cash += bf.price; s.bot.inv -= 1; s.bot.est += TICK * 0.6; }
-    else { s.bot.cash -= bf.price; s.bot.inv += 1; s.bot.est -= TICK * 0.6; }
+    if (bf.side === "buy") { s.bot.cash += bf.price; s.bot.inv -= 1; s.bot.est += 3; }
+    else { s.bot.cash -= bf.price; s.bot.inv += 1; s.bot.est -= 3; }
   }
 
   s.vPath.push(s.V);

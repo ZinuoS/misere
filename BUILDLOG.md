@@ -294,3 +294,96 @@ fallback because `verify_login` does not exist in the live project yet — confi
 **Open, deliberately:** the leaderboard still holds e2e rows (`zz` prefix) — `supabase/cleanup_test_rows.sql` clears them, and it has to run from the SQL editor because the anon key cannot delete, which is the RLS working. Handles claimed before password accounts have a device-secret hash and no password, so they cannot be signed into; they are not in the cleanup list yet by design.
 
 **What I would do next with more time:** self-host the three font families (LCP is still font-swap-dominated), and watch whether the 13:30-20:00 UTC session window suppresses daily submissions — it is the research instrument, and two constants in `data/market.ts` widen it.
+
+## Retune — from chase game to inference game
+
+**The diagnosis was right.** Difficulty had been raised on volatility, so the posterior never
+tightened and inventory luck swamped skill. Fair value is now drawn once from Uniform(0, 1000)
+and is persistent: drift sigma 3, reflecting barriers at both walls, one warned news event of
++/-(40-80) at a uniform tick in [18, 28], prints at 15% with sigma 35. V0, the news tick and the
+news size all come from the injected PRNG, so a daily seed still pins the whole scenario.
+
+**Before number (gate 1):** median luck share for the best available policy on the old engine was
+**0.500** (EWMA, misere, n=1000) — half of the P&L was inventory noise.
+
+### Two structural findings, and a deviation from the letter of the brief
+
+**1. With quotes free anywhere in 0-1000, misere is not an inference game — it is a corner
+solution.** Loss per lot is |price - V|, so "lose the most" is maximised by parking at a range
+edge, and WHERE V sits barely matters. Measured: a print-only EWMA bot beat the full Bayesian bot
+in **all 24** (band x print-rate x anchor-weight) configurations I swept, by up to 0.9 pooled sd.
+Gate 3 explicitly says that if EWMA ties BAYES the information structure is at fault and must be
+fixed — so I fixed it rather than weakening EWMA.
+
+**2. The fix is a real exchange rule: clearly-erroneous execution.** A fill more than `TUNE.BUST`
+(90) from true fair value is voided, exactly as an exchange busts an obviously mispriced print.
+The payoff becomes a ridge — be wrong by just under BUST, on the correct side — which is
+impossible without a tight posterior. Being wildly wrong now earns nothing. This also enriches the
+information structure: a fill that STANDS is a two-sided bound (V is past the price, but within
+BUST of it), and a bust is itself evidence that V is far away.
+
+Consequently solo quotes are bounded to +/-`TUNE.SOLO_BAND` (250) of the public print anchor
+rather than the full range. **This is a deliberate deviation from "the range IS the band"**, and it
+is the only way I could find to make gate 3 pass without weakening a bot. The wide prior — the part
+the brief insisted on — is untouched: V0 is still Uniform(0, 1000) and still hidden.
+
+### Gate results (n=1000 per bot per mode)
+
+```
+EWMA|misere    score mean    295.3  sd   393.1  median luck 0.030
+BAYES|misere   score mean    804.8  sd   486.6  median luck 0.191
+RANDOM|normal  score mean   -152.5  sd   150.2  median luck 0.274
+EWMA|normal    score mean   -275.5  sd   402.4  median luck 0.363
+BAYES|normal   score mean   -120.8  sd   311.2  median luck 0.358
+
+GATE 1 luck share      BAYES misere median 0.191 < 0.35        PASS
+GATE 2 learnability    sd<10 by tick 20 in 87.0% (n=754) >= 70%   PASS
+GATE 3 skill gap       misere BAYES-RANDOM d=1.81 (>1.0), BAYES-EWMA d=1.15 (>0.5)  PASS
+       (normal mode    BAYES-RANDOM d=0.13, BAYES-EWMA d=0.43)
+```
+
+All three pass. Normal mode's skill gap is smaller (d=0.13 vs RANDOM, 0.43 vs EWMA) because under
+the bust rule everyone bleeds to informed flow; the gates are specified on misere, but this is
+worth watching.
+
+### Recalibrated verdict tiers
+
+Calibration now pools 3,000 games from the three reference bots (no-skill / public-info /
+full-inference) rather than three scripted policies, so the distribution spans real skill.
+
+```
+n=3000 (3 bots x 1000), zero-fill games: 427
+min -476  p10 0  p25 50  median 265  p75 655  p90 1074  p99 1927  max 2366
+
+suggested bands (paste the `lo` values into ui/verdicts.ts, highest first):
+  lo   1950     0.8%  FINAL BOSS OF ADVERSE SELECTION    p99.2 and up
+  lo    850    15.4%  SUPERFUND SITE                     up to p99.2
+  lo    550    15.1%  CERTIFIED TOXIC                    up to p83.7
+  lo    300    15.5%  GUH.                               up to p68.6
+  lo    125    18.4%  MONEY BURNER                       up to p53.1
+  lo     20    13.0%  PETTY CASH ARSONIST                up to p34.7
+  lo      0    15.9%  THE EFFICIENT MARKET HYPOTHESIS    up to p21.7
+  lo      0     0.0%  SPREAD GOBLIN                      up to p5.8
+  lo    -80     3.8%  ACCIDENTAL RAINMAKER               up to p5.8
+  lo   -inf     2.0%  GENERATIONAL WEALTH (WRONG GAME)   up to p2.0
+```
+
+Final cuts (profit side hand-set, because two percentiles both rounded to zero and would have made
+SPREAD GOBLIN unreachable): -250, -80, -20, 20, 125, 300, 550, 850, 1950. Every tier reachable
+(min 0.5%), median score 265 lands in **tier 6 of 10**, apex at **p99.2**.
+
+### UI
+
+Steppers now accelerate on press-and-hold (TICK for 400ms, then COARSE=25 per 90ms repeat), so any
+legal quote is one interaction away — a second +/-25 row was NOT enough, since 250 to 800 would
+still have been 22 taps. Opening quote is 250/750 and the reference reads "value in 0-1000" until
+the first print. How-to-play copy rewritten for the inference game.
+
+**Bug found by the screenshots:** the tape rendered `flex-col-reverse`, which parks the scroll at
+the OLDEST of the last 14 entries — at tick 17 the visible window showed ticks 06-10, hiding the
+tick you just played. Fatal in a game where the tape is the only evidence. Now newest-first in
+normal flow order.
+
+**Verification:** 42 unit tests (new: reflection at both walls including moves larger than the
+range, exactly one warned news event inside [18,28] with magnitude 40-80, no booked fill ever
+further than BUST from V, solo quote legality fuzz), dummy 13 rows / 0 failures, 34 screenshots.

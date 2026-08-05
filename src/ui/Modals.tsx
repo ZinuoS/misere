@@ -41,9 +41,9 @@ const HowDiagram = () => (
 export const HowToPlay = ({ onClose }: { onClose: () => void }) => (
   <Shell testid="onboard" title="How to lose" onClose={onClose}>
     <ul className="mt-3 flex flex-col gap-2 text-sm leading-relaxed">
-      <li><b>Quote.</b> Post a bid and an offer around a fair value you cannot see. It drifts every tick.</li>
-      <li><b>Get filled.</b> Sharps know that value; noise traders don't. Being picked off is the point.</li>
-      <li><b>Lose.</b> 40 ticks. Most money destroyed wins. Profit is failure.</li>
+      <li><b>Quote.</b> Fair value is drawn somewhere between 0 and 1000, then barely moves. Start wide.</li>
+      <li><b>Narrow in.</b> Every fill tells you which side you got wrong. Sharps only trade when your price is wrong.</li>
+      <li><b>Lose.</b> 40 ticks. Most money destroyed wins - but a trade far from fair value is busted, so be wrong on purpose, not by accident.</li>
     </ul>
     <HowDiagram />
   </Shell>

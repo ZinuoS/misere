@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { MIN_SPREAD, TICK, type TapeEntry } from "../engine/types";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { COARSE, MIN_SPREAD, TICK, type TapeEntry } from "../engine/types";
 
 const GROUPED = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -13,15 +13,49 @@ export const Stat = ({ label, value, color }: { label: string; value: string; co
   </div>
 );
 
-export const QBtn = ({ onClick, children, tone }: { onClick: () => void; children: ReactNode; tone: string }) => (
-  <button
-    onClick={onClick}
-    className="h-11 w-11 rounded-md border border-hair bg-panel2 font-mono text-lg transition-transform active:scale-95"
-    style={{ color: tone }}
-  >
-    {children}
-  </button>
-);
+/**
+ * Stepper button with press-and-hold acceleration. Fair value now lives anywhere
+ * in 0-1000, so a fixed TICK stepper would need dozens of taps to open wide.
+ * Tap = one TICK; hold = repeats after 400ms, and steps up to COARSE after a
+ * second, so any legal quote is reachable in a single interaction.
+ */
+export const QBtn = ({ step, dir, children, tone, testid }: {
+  step: (d: number) => void; dir: 1 | -1; children: ReactNode; tone: string; testid?: string;
+}) => {
+  const timers = useRef<{ start?: number; repeat?: number; held: number }>({ held: 0 });
+
+  const stop = useCallback(() => {
+    clearTimeout(timers.current.start);
+    clearInterval(timers.current.repeat);
+    timers.current = { held: 0 };
+  }, []);
+  useEffect(() => stop, [stop]);
+
+  const begin = () => {
+    step(dir * TICK);
+    timers.current.start = setTimeout(() => {
+      timers.current.repeat = setInterval(() => {
+        timers.current.held += 1;
+        step(dir * (timers.current.held > 6 ? COARSE : TICK));
+      }, 90) as unknown as number;
+    }, 400) as unknown as number;
+  };
+
+  return (
+    <button
+      data-testid={testid}
+      onPointerDown={(e) => { e.preventDefault(); begin(); }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onClick={(e) => e.preventDefault()}
+      className="h-11 w-11 touch-none rounded-md border border-hair bg-panel2 font-mono text-lg transition-transform active:scale-95"
+      style={{ color: tone }}
+    >
+      {children}
+    </button>
+  );
+};
 
 export const BigBtn = ({ onClick, children, subtle, testid }: {
   onClick: () => void; children: ReactNode; subtle?: boolean; testid?: string;
@@ -42,7 +76,7 @@ export const Panel = ({ children, className = "" }: { children: ReactNode; class
 );
 
 export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, accent }: {
-  title: string; bid: number; ask: number; ref_: number;
+  title: string; bid: number; ask: number; ref_: number | null;
   onAdj?: (which: "bid" | "ask", d: number) => void;
   onSkew?: (d: number) => void;
   readOnly?: boolean; accent: string;
@@ -51,15 +85,17 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
     <div className="rounded-lg border bg-panel p-4" style={{ borderColor: readOnly ? "var(--hair)" : accent }}>
       <div className="mb-2 flex justify-between text-xs uppercase tracking-widest text-muted">
         <span style={{ color: accent }}>{title}</span>
-        <span>ref <span className="font-mono text-ink">{price(ref_)}</span></span>
+        <span>{ref_ === null
+          ? <span className="font-mono text-ink">value in 0-1000</span>
+          : <>last <span className="font-mono text-ink">{price(ref_)}</span></>}</span>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex flex-col items-center gap-2">
           <span className="font-mono text-2xl text-bid">{price(bid)}</span>
           {!readOnly && (
             <div className="flex gap-2">
-              <QBtn tone="var(--bid)" onClick={() => onAdj!("bid", -TICK)}>&minus;</QBtn>
-              <QBtn tone="var(--bid)" onClick={() => onAdj!("bid", TICK)}>+</QBtn>
+              <QBtn tone="var(--bid)" dir={-1} step={(d) => onAdj!("bid", d)} testid="bid-down">&minus;</QBtn>
+              <QBtn tone="var(--bid)" dir={1} step={(d) => onAdj!("bid", d)} testid="bid-up">+</QBtn>
             </div>
           )}
           <span className="text-xs uppercase tracking-widest text-muted">bid</span>
@@ -72,8 +108,8 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
           {!readOnly && (
             <>
               <div className="mt-2 flex gap-2">
-                <QBtn tone="var(--ink)" onClick={() => onSkew!(-TICK)}>&laquo;</QBtn>
-                <QBtn tone="var(--ink)" onClick={() => onSkew!(TICK)}>&raquo;</QBtn>
+                <QBtn tone="var(--ink)" dir={-1} step={(d) => onSkew!(d)} testid="skew-down">&laquo;</QBtn>
+                <QBtn tone="var(--ink)" dir={1} step={(d) => onSkew!(d)} testid="skew-up">&raquo;</QBtn>
               </div>
               <span className="mt-1 text-xs text-muted">skew</span>
             </>
@@ -83,8 +119,8 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
           <span className="font-mono text-2xl text-ask">{price(ask)}</span>
           {!readOnly && (
             <div className="flex gap-2">
-              <QBtn tone="var(--ask)" onClick={() => onAdj!("ask", -TICK)}>&minus;</QBtn>
-              <QBtn tone="var(--ask)" onClick={() => onAdj!("ask", TICK)}>+</QBtn>
+              <QBtn tone="var(--ask)" dir={-1} step={(d) => onAdj!("ask", d)} testid="ask-down">&minus;</QBtn>
+              <QBtn tone="var(--ask)" dir={1} step={(d) => onAdj!("ask", d)} testid="ask-up">+</QBtn>
             </div>
           )}
           <span className="text-xs uppercase tracking-widest text-muted">offer</span>
@@ -97,20 +133,25 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
 const tapeColor = { sharp: "var(--red)", noise: "var(--gold)", print: "var(--bid)", sys: "var(--muted)" };
 
 export const Tape = ({ entries }: { entries: TapeEntry[] }) => {
-  const shown = entries.slice(-14);
+  // Newest first, in normal flow order. A flex-col-reverse column parks its
+  // scroll at the OLDEST entry, which hid the tick you just played - fatal when
+  // the tape is the only evidence about fair value.
+  const shown = entries.slice(-14).reverse();
   return (
     <Panel className="p-3">
-      <div className="mb-2 text-xs uppercase tracking-widest text-muted">Tape</div>
-      <div className="flex max-h-32 flex-col-reverse gap-1 overflow-y-auto font-mono text-xs leading-relaxed">
-        {entries.length <= 1 && (
-          <div className="text-muted italic">No flow yet. Post your quotes and someone will take the other side.</div>
-        )}
-        {shown.map((e, i) => (
-          <div key={`${e.t}-${i}`} className={i === shown.length - 1 ? "flip-new" : ""} style={{ color: tapeColor[e.kind] }}>
-            <span className="text-muted">{String(e.t).padStart(2, "0")}&nbsp;</span>
-            {e.text}
-          </div>
-        ))}
+      <div data-testid="tape">
+        <div className="mb-2 text-xs uppercase tracking-widest text-muted">Tape</div>
+        <div className="flex max-h-32 flex-col gap-1 overflow-y-auto font-mono text-xs leading-relaxed">
+          {entries.length <= 1 && (
+            <div className="text-muted italic">No flow yet. Post your quotes and someone will take the other side.</div>
+          )}
+          {shown.map((e, i) => (
+            <div key={`${e.t}-${i}`} className={i === 0 ? "flip-new" : ""} style={{ color: tapeColor[e.kind] }}>
+              <span className="text-muted">{String(e.t).padStart(2, "0")}&nbsp;</span>
+              {e.text}
+            </div>
+          ))}
+        </div>
       </div>
     </Panel>
   );

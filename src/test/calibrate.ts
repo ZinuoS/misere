@@ -1,63 +1,62 @@
 /// <reference types="node" />
-// Tier-band calibration: 1,000 seeded misère games across mixed policies.
-// Prints the score distribution used to set the bands in ui/verdicts.ts.
+// Verdict tier calibration. Pools 1,000 seeded misere games from each reference
+// bot, so the distribution spans real skill (RANDOM = none, EWMA = public info
+// only, BAYES = full inference) instead of three crude scripted policies.
+// Cuts are placed at fixed percentiles so every tier is reachable, the modal
+// outcome lands mid-ladder, and the apex sits at ~p99.
 import { mulberry32 } from "../engine/rng";
 import { soloInit, soloStep, soloTruePnl } from "../engine/solo";
-import { act, POLICIES } from "./dummy";
+import { makeBot, type BotName } from "./bots";
 
+const N = 1000;
 const scores: number[] = [];
 let zeroFill = 0;
 
-for (let seed = 1; seed <= 1000; seed++) {
-  const policy = POLICIES[seed % POLICIES.length];
-  const rng = mulberry32(seed);
-  const s = soloInit();
-  while (!s.done) {
-    act(policy, s, rng);
-    soloStep(s, rng);
+for (const name of ["RANDOM", "EWMA", "BAYES"] as BotName[]) {
+  for (let seed = 1; seed <= N; seed++) {
+    const rng = mulberry32(seed);
+    const s = soloInit(rng);
+    const bot = makeBot(name, "misere");
+    while (!s.done) {
+      bot.quote(s, rng);
+      soloStep(s, rng);
+      bot.observe?.(s);
+    }
+    if (s.fills.length === 0) zeroFill++;
+    scores.push(-soloTruePnl(s)); // score = money destroyed
   }
-  if (s.fills.length === 0) zeroFill++;
-  scores.push(-soloTruePnl(s)); // score = money destroyed
 }
 
 scores.sort((a, b) => a - b);
 const q = (p: number) => scores[Math.min(scores.length - 1, Math.floor(p * scores.length))];
-const pct = (lo: number, hi: number) =>
-  ((scores.filter((x) => x >= lo && x < hi).length / scores.length) * 100).toFixed(1);
+const rank = (v: number) => (scores.filter((x) => x < v).length / scores.length) * 100;
 
-console.log("n=1000, zero-fill games:", zeroFill);
-console.log("min", q(0).toFixed(2), "p25", q(0.25).toFixed(2), "median", q(0.5).toFixed(2),
-  "p75", q(0.75).toFixed(2), "p90", q(0.9).toFixed(2), "p95", q(0.95).toFixed(2),
-  "p99", q(0.99).toFixed(2), "max", scores[scores.length - 1].toFixed(2));
+console.log(`n=${scores.length} (3 bots x ${N}), zero-fill games: ${zeroFill}`);
+console.log(
+  `min ${q(0).toFixed(0)}  p10 ${q(0.1).toFixed(0)}  p25 ${q(0.25).toFixed(0)}  median ${q(0.5).toFixed(0)}` +
+  `  p75 ${q(0.75).toFixed(0)}  p90 ${q(0.9).toFixed(0)}  p99 ${q(0.99).toFixed(0)}  max ${scores.at(-1)!.toFixed(0)}`,
+);
 
-const rank = (v: number) => ((scores.filter((x) => x < v).length / scores.length) * 100).toFixed(1);
-const show = (label: string, bands: [number, number, string][]) => {
-  console.log(`\n${label}:`);
-  for (const [lo, hi, name] of bands) {
-    const edge = hi === Infinity ? `p${rank(lo)} and up` : `up to p${rank(hi)}`;
-    console.log(`  ${pct(lo, hi).padStart(5)}%  ${name.padEnd(34)} ${edge}`);
-  }
+// 9 cuts -> 10 tiers. Apex at p99, median lands in tier 6 of 10.
+const PCTS = [0.02, 0.06, 0.12, 0.22, 0.36, 0.52, 0.68, 0.84, 0.99];
+const NAMES = [
+  "GENERATIONAL WEALTH (WRONG GAME)", "ACCIDENTAL RAINMAKER", "SPREAD GOBLIN",
+  "THE EFFICIENT MARKET HYPOTHESIS", "PETTY CASH ARSONIST", "MONEY BURNER",
+  "GUH.", "CERTIFIED TOXIC", "SUPERFUND SITE", "FINAL BOSS OF ADVERSE SELECTION",
+];
+const nice = (x: number) => {
+  const step = Math.abs(x) >= 500 ? 50 : Math.abs(x) >= 100 ? 25 : Math.abs(x) >= 20 ? 10 : 5;
+  return Math.round(x / step) * step;
 };
+const cuts = PCTS.map((p) => nice(q(p)));
 
-const CUTS = [1, 10, 25, 45, 75, 150];
-console.log("\nold bands at the new scale:");
-show("old", [
-  [-Infinity, -15, "GENERATIONAL WEALTH"], [-15, -5, "RAINMAKER"], [-5, -1, "GOBLIN"],
-  [-1, 1, "EMH"], [1, 10, "PETTY CASH"], [10, 25, "MONEY BURNER"], [25, 45, "GUH."],
-  [45, 75, "CERTIFIED TOXIC"], [75, 150, "SUPERFUND"], [150, Infinity, "FINAL BOSS"],
-]);
-void CUTS;
-
-// candidate: profit side scaled 10x, loss side pinned to the observed percentiles
-show("calibrated for the 1000-level market", [
-  [-Infinity, -300, "GENERATIONAL WEALTH (WRONG GAME)"],
-  [-300, -100, "ACCIDENTAL RAINMAKER"],
-  [-100, -20, "SPREAD GOBLIN"],
-  [-20, 20, "THE EFFICIENT MARKET HYPOTHESIS"],
-  [20, 150, "PETTY CASH ARSONIST"],
-  [150, 400, "MONEY BURNER"],
-  [400, 750, "GUH."],
-  [750, 1200, "CERTIFIED TOXIC"],
-  [1200, 2500, "SUPERFUND SITE"],
-  [2500, Infinity, "FINAL BOSS OF ADVERSE SELECTION"],
-]);
+console.log("\nsuggested bands (paste the `lo` values into ui/verdicts.ts, highest first):");
+for (let i = NAMES.length - 1; i >= 0; i--) {
+  const lo = i === 0 ? -Infinity : cuts[i - 1];
+  const hi = i === NAMES.length - 1 ? Infinity : cuts[i];
+  const share = scores.filter((x) => x >= lo && x < hi).length / scores.length * 100;
+  const edge = hi === Infinity ? `p${rank(lo).toFixed(1)} and up` : `up to p${rank(hi).toFixed(1)}`;
+  console.log(
+    `  lo ${String(lo === -Infinity ? "-inf" : lo).padStart(6)}   ${share.toFixed(1).padStart(5)}%  ${NAMES[i].padEnd(34)} ${edge}`,
+  );
+}

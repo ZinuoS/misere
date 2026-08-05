@@ -17,36 +17,36 @@ const DIMS: Record<string, [number, number]> = {
   "/img/brokers-curb.jpg": [800, 624],
 };
 
-// Misère ladder. Bands re-calibrated over 1,000 seeded dummy games after the market
-// moved to the 1000 level (see BUILDLOG);
+// Misere ladder. Bands re-calibrated over 3,000 seeded games (RANDOM + EWMA + BAYES,
+// 1,000 each) after the market became an inference game; see BUILDLOG for the table.
 // `lo` is the inclusive floor on score = money destroyed.
 const MISERE: { lo: number; headline: string; sub: string; img: string }[] = [
   {
-    lo: 2500,
+    lo: 1950,
     headline: "FINAL BOSS OF ADVERSE SELECTION",
     sub: "You found fair value, looked it in the eye, and quoted its opposite. The sharps light candles for you.",
     img: "/img/breadline.jpg",
   },
   {
-    lo: 1200,
+    lo: 850,
     headline: "SUPERFUND SITE",
     sub: "Your order flow requires federal environmental remediation.",
     img: "/img/breadline.jpg",
   },
   {
-    lo: 750,
+    lo: 550,
     headline: "CERTIFIED TOXIC",
     sub: "Flow desks would pay for the privilege of trading against you.",
     img: "/img/bank-run.jpg",
   },
   {
-    lo: 400,
+    lo: 300,
     headline: "GUH.",
     sub: "That sound was your P&L. Somewhere, a risk officer felt a disturbance.",
     img: "/img/bank-run.jpg",
   },
   {
-    lo: 150,
+    lo: 125,
     headline: "MONEY BURNER",
     sub: "Not a leak. A policy. The desk now doubles as a space heater.",
     img: "/img/crowd-nyse.jpg",
@@ -64,13 +64,13 @@ const MISERE: { lo: number; headline: string; sub: string; img: string }[] = [
     img: "/img/curb-market.jpg",
   },
   {
-    lo: -100,
+    lo: -80,
     headline: "SPREAD GOBLIN",
     sub: "You farmed the noise flow like a common market maker. Have you no shame.",
     img: "/img/curb-market.jpg",
   },
   {
-    lo: -300,
+    lo: -250,
     headline: "ACCIDENTAL RAINMAKER",
     sub: "You accidentally ran a profitable desk. Delete your terminal.",
     img: "/img/brokers-curb.jpg",
@@ -84,10 +84,10 @@ const MISERE: { lo: number; headline: string; sub: string; img: string }[] = [
 ];
 
 const NORMAL: { lo: number; headline: string; sub: string; img: string }[] = [
-  { lo: 400, headline: "THE DESK HEAD NODS ONCE", sub: "Highest honor available. Do not ask for more.", img: "/img/brokers-curb.jpg" },
-  { lo: 150, headline: "SPREAD FARMER", sub: "Honest work. The noise thanks you for your service.", img: "/img/curb-market.jpg" },
+  { lo: 300, headline: "THE DESK HEAD NODS ONCE", sub: "Highest honor available. Do not ask for more.", img: "/img/brokers-curb.jpg" },
+  { lo: 100, headline: "SPREAD FARMER", sub: "Honest work. The noise thanks you for your service.", img: "/img/curb-market.jpg" },
   { lo: 20, headline: "PAPER CUT PROFITS", sub: "Technically green. Emotionally beige.", img: "/img/curb-market.jpg" },
-  { lo: -150, headline: "TUITION PAID", sub: "The market taught. You paid. Standard rates.", img: "/img/crowd-nyse.jpg" },
+  { lo: -250, headline: "TUITION PAID", sub: "The market taught. You paid. Standard rates.", img: "/img/crowd-nyse.jpg" },
   { lo: -Infinity, headline: "EXIT LIQUIDITY", sub: "The sharps saw you coming from three ticks away. You were the product.", img: "/img/bank-run.jpg" },
 ];
 

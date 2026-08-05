@@ -4,7 +4,7 @@ import {
   adjust, skew, soloInit, soloStep, soloTruePnl, type SoloState,
 } from "../engine/solo";
 import { decompose, residual } from "../engine/decompose";
-import { INV_CAP, SOLO_T, type Rng } from "../engine/types";
+import { INV_CAP, SOLO_T, V_MID, type Rng } from "../engine/types";
 import type { GameReport } from "../data/supabase";
 import type { DailyStats } from "../data/daily";
 import type { DailyResult } from "./Home";
@@ -26,8 +26,8 @@ export function SoloGame({ mode, seed, daily, dailyShare, onStats, onExit, repor
   const startRef = useRef(Date.now());
   const [gen, force] = useReducer((x: number) => x + 1, 0);
   if (sRef.current === null) {
-    sRef.current = soloInit();
     rngRef.current = mulberry32(seed + (daily ? 0 : gen));
+    sRef.current = soloInit(rngRef.current);
     startRef.current = Date.now();
   }
   const s = sRef.current;
@@ -57,7 +57,9 @@ export function SoloGame({ mode, seed, daily, dailyShare, onStats, onExit, repor
     force(); // re-init on next render with seed + gen
   };
 
-  const mtm = s.cash + s.inv * s.lastRef;
+  // no print yet => mark inventory at the prior mean, never at our own quote
+  const mark = s.lastRef ?? V_MID;
+  const mtm = s.cash + s.inv * mark;
   const good = misere ? mtm < 0 : mtm > 0;
 
   return (
