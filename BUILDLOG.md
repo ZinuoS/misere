@@ -11,3 +11,17 @@ Self-reviews per milestone. Newest at the bottom.
 **Smelled wrong:** the mobile Playwright project defaulted to WebKit (iPhone 12 device profile) with only Chromium installed — forced `browserName: "chromium"`, viewport is what matters for shots. Vite's template ships React 19; pinned react/react-dom/@types to 18 per the spec.
 
 **Would fix with more time:** self-host the Google Fonts (one less external request, matters for the Lighthouse M6 gate). Deferred until M6 proves it necessary.
+
+## M1 — Engine extraction
+
+**Built:** six pure TS modules under `src/engine/` — `types` (canonical constants + shared types), `rng` (mulberry32 + Box-Muller randn, every draw flows through one injected PRNG), `solo` (faithful port of the prototype step: print EWMA anchor, informed/noise flow, inventory blocking, honest benchmark bot), `comp` (NBBO two-desk engine with per-desk fills/invPath/quoteLog so the decomposition works per desk — the prototype didn't record edge/sharp on comp fills, telemetry needs it), `eris` (extracted bot policy), `decompose` (identity + residual). Engine mutates state; React wrapping is M2's problem. `soloStep`/`compStep` take a test-only `printProb` override for the tape-painting regression.
+
+**Deliberate deviation:** `clampMkt` now snaps the band edges inward to the 0.5 grid (`ceil2(anchor-BAND)`, `floor2(anchor+BAND)`) before clamping. The prototype rounded after clamping, which could push a boundary quote up to 0.25 outside the band — the required "never leaves the band" test fails on the prototype's version. Effective band is up to 0.5 narrower; quotes always on grid, never crossed, spread floor exact.
+
+**Dummy run:** 6 rows (2 solo modes x 3 policies), all 40 ticks, residuals at 1e-14 (float epsilon), zero errors. Sanity: max-skew loses -45 in misère (band-top camping donates spread), floor-camper gets picked off for -45/-22 — the economics look right.
+
+**Tests:** 11 green — identity across 500 solo + 500 comp seeded games (both desks), clampMkt 10k fuzz, inventory cap solo+comp, NBBO strict-better/cap-eligibility/tie chi-squared, tape-painting (anchor bit-identical under self-fills with zero prints), ERIS band+spread+side-flip.
+
+**Smelled wrong:** ERIS's 10% random flip runs AFTER her cap-guard flip, so she can randomly flip back toward her cap for one tick. Prototype behaves identically; routing eligibility still hard-caps her. Left as-is, noted.
+
+**Would fix with more time:** dummy comp rows (dummy vs ERIS, dummy vs dummy) — spec puts those in M4.
