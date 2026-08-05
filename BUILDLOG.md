@@ -416,3 +416,20 @@ cache (or the still-deployed old version). SW cache bumped to md-v3 so the next 
 Standing lesson recorded the first time this happened; it happened again anyway because the
 bump is manual. ponytail: cache name is hand-bumped; derive it from the build hash if this
 bites a third time.
+
+## Retune shipped
+
+User verdict after live play: "the range adjusting feels like a quant interview" — the retune's
+target register, confirmed at the desk. Player reacted to the news banner and improved their loss.
+
+**Drift double-check (user-requested):** a specimen test now pins the attribution end to end —
+a game with exactly one fill held through the news event has `invPnl = inv x (V_end - V_at_fill)`
+to 1e-6 and `pnl = fill edge + drift`. The headline jump lands in the drift bucket, where it
+belongs: holding through news is inventory risk, not craft. 47 unit tests green.
+
+**Production verification:** deploy auto-triggered on push; bundle carries the retune markers
+(news banner, bust rule, typed inputs, 0-1000 tape line); SW serving md-v3 so stale builds purge;
+PWA offline reload OK; Lighthouse mobile **91** (CLS 0, TBT 0ms); live gate reports the correct
+registry and key, zero page errors. Leaderboard is already on the new score scale — top spot is a
+real player at $1,637.84 destroyed, above the e2e rows at $1,516.20 (cleanup SQL still available
+to clear the zz rows).
