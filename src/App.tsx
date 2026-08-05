@@ -1,6 +1,12 @@
-import { useRef, useState } from "react";
-import { Home, type ModeId } from "./ui/Home";
+import { useEffect, useRef, useState } from "react";
+import { dateSeed } from "./engine/rng";
+import { getIdentity, sha256Hex, type Identity } from "./data/identity";
+import { fetchMyTelemetry, submitGame, type GameReport } from "./data/supabase";
+import { dailyStats, todayISO, type DailyStats } from "./data/daily";
+import { Gate } from "./ui/Gate";
+import { Home, type DailyResult, type ModeId } from "./ui/Home";
 import { SoloGame } from "./ui/SoloGame";
+import { CompGame } from "./ui/CompGame";
 import { LOADING_LINES } from "./ui/verdicts";
 
 const HEADLINES = [
@@ -16,11 +22,59 @@ const HEADLINES = [
 const seedParam = Number(new URLSearchParams(window.location.search).get("seed"));
 const BASE_SEED = Number.isFinite(seedParam) && seedParam > 0 ? seedParam : Date.now();
 
+const EMPTY_STATS: DailyStats = { played: 0, streak: 0, maxStreak: 0, best: null };
+
+const loadDailyResult = (today: string): DailyResult | null => {
+  try {
+    const r = JSON.parse(localStorage.getItem("md:daily") || "") as DailyResult;
+    return r.date === today ? r : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function App() {
+  const [identity, setIdentity] = useState<Identity | null>(getIdentity);
   const [mode, setMode] = useState<ModeId | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [onboard, setOnboard] = useState(() => !localStorage.getItem("md:onboard"));
+  const [toast, setToast] = useState<GameReport | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const today = todayISO();
+  const [dailyResult, setDailyResult] = useState<DailyResult | null>(() => loadDailyResult(today));
+  const [stats, setStats] = useState<DailyStats>(EMPTY_STATS);
   const lineRef = useRef(0);
+
+  useEffect(() => {
+    if (!identity) return;
+    (async () => {
+      try {
+        setStats(dailyStats(await fetchMyTelemetry(identity, await sha256Hex(identity.secret)), today));
+      } catch { /* stats stay empty; not worth a toast */ }
+    })();
+  }, [identity, refreshKey, today]);
+
+  const report = async (r: GameReport) => {
+    if (!identity) return;
+    if (r.dailyDate) {
+      const result: DailyResult = {
+        date: r.dailyDate,
+        score: -r.pnl,
+        sharp: r.sharpEdge,
+        noise: r.noiseEdge,
+        inv: r.invPnl,
+      };
+      localStorage.setItem("md:daily", JSON.stringify(result));
+      setDailyResult(result);
+    }
+    try {
+      await submitGame(identity, await sha256Hex(identity.secret), r);
+      setToast(null);
+      setRefreshKey((k) => k + 1);
+    } catch {
+      setToast(r); // telemetry must never silently fail
+    }
+  };
 
   const dismissOnboard = () => {
     localStorage.setItem("md:onboard", "1");
@@ -63,12 +117,37 @@ export default function App() {
           )}
         </header>
 
-        {loading && (
-          <p className="py-16 text-center font-mono text-sm text-muted">{loading}&hellip;</p>
-        )}
-        {!loading && !mode && <Home onPick={pick} />}
-        {!loading && (mode === "misere" || mode === "normal") && (
-          <SoloGame mode={mode} seed={BASE_SEED} onExit={() => setMode(null)} />
+        {!identity && <Gate onClaimed={setIdentity} />}
+        {identity && (
+          <>
+            {loading && <p className="py-16 text-center font-mono text-sm text-muted">{loading}&hellip;</p>}
+            {!loading && !mode && (
+              <Home
+                onPick={pick}
+                identity={identity}
+                today={today}
+                dailyResult={dailyResult}
+                stats={stats}
+                refreshKey={refreshKey}
+              />
+            )}
+            {!loading && (mode === "misere" || mode === "normal") && (
+              <SoloGame mode={mode} seed={BASE_SEED} onExit={() => setMode(null)} report={report} />
+            )}
+            {!loading && mode === "daily" && (
+              <SoloGame
+                mode="misere"
+                seed={dateSeed(today)}
+                daily={today}
+                dailyShare={{ result: dailyResult, stats }}
+                onExit={() => setMode(null)}
+                report={report}
+              />
+            )}
+            {!loading && (mode === "eris" || mode === "duel") && (
+              <CompGame vsBot={mode === "eris"} seed={BASE_SEED} onExit={() => setMode(null)} report={report} />
+            )}
+          </>
         )}
 
         <footer className="pb-4 pt-8 text-center text-xs text-muted">
@@ -76,7 +155,16 @@ export default function App() {
         </footer>
       </div>
 
-      {onboard && !mode && (
+      {toast && (
+        <div data-testid="retry-toast" className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center justify-between rounded-lg border border-red bg-paper p-3 shadow-xl">
+          <span className="font-mono text-xs uppercase tracking-widest text-red">Telemetry lost in the mail.</span>
+          <button onClick={() => report(toast)} className="rounded-full bg-ink px-4 py-2 font-mono text-xs uppercase tracking-widest text-paper">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {onboard && identity && !mode && (
         <div data-testid="onboard" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-6">
           <div className="w-full max-w-sm rounded-lg border border-hair bg-paper p-6 shadow-xl">
             <h2 className="font-display text-2xl font-black uppercase tracking-tight">How to lose</h2>

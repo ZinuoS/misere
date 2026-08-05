@@ -1,28 +1,55 @@
+import { useState } from "react";
 import { BAND, COMP_T, INV_CAP, MIN_SPREAD, SOLO_T } from "../engine/types";
-import { Panel } from "./atoms";
+import { dailyNumber, shareCard, type DailyStats } from "../data/daily";
+import type { Identity } from "../data/identity";
+import { money, Panel } from "./atoms";
+import { Leaderboard, ResearchPanel } from "./Panels";
 
 const MODES = [
   {
-    id: "misere", testid: "mode-misere", title: "Solo — Misère", live: true,
-    blurb: `Lose as much as possible in ${SOLO_T} ticks. Full recap: P&L decomposition and the verdict you deserve.`,
+    id: "misere", testid: "mode-misere", title: "Solo — Misère",
+    blurb: `Practice: lose as much as possible in ${SOLO_T} ticks. Fresh tape every run.`,
   },
   {
-    id: "normal", testid: "mode-normal", title: "Solo — Normal", live: true,
+    id: "normal", testid: "mode-normal", title: "Solo — Normal",
     blurb: "Same engine, opposite objective: make money. Shameful, but tracked.",
   },
   {
-    id: "eris", testid: "mode-eris", title: "vs ERIS", live: false,
+    id: "eris", testid: "mode-eris", title: "vs ERIS",
     blurb: `She overbids one side of her fair-value estimate and fights you for the toxic flow. ${COMP_T} ticks.`,
   },
   {
-    id: "duel", testid: "mode-duel", title: "Duel", live: false,
+    id: "duel", testid: "mode-duel", title: "Duel",
     blurb: `Pass-and-play. Best price wins the flow, worst P&L wins the game. ${COMP_T} ticks.`,
   },
 ] as const;
 
-export type ModeId = (typeof MODES)[number]["id"];
+export type ModeId = (typeof MODES)[number]["id"] | "daily";
 
-export function Home({ onPick }: { onPick: (m: ModeId) => void }) {
+export interface DailyResult {
+  date: string;
+  score: number;
+  sharp: number;
+  noise: number;
+  inv: number;
+}
+
+export function Home({ onPick, identity, today, dailyResult, stats, refreshKey }: {
+  onPick: (m: ModeId) => void;
+  identity: Identity;
+  today: string;
+  dailyResult: DailyResult | null;
+  stats: DailyStats;
+  refreshKey: number;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copyShare = () => {
+    if (!dailyResult) return;
+    navigator.clipboard
+      .writeText(shareCard(dailyResult.date, dailyResult.score, dailyResult.sharp, dailyResult.noise, dailyResult.inv))
+      .then(() => setCopied(true));
+  };
+
   return (
     <div className="relative flex flex-col gap-3">
       <div
@@ -30,27 +57,67 @@ export function Home({ onPick }: { onPick: (m: ModeId) => void }) {
         className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center opacity-[0.045] grayscale"
         style={{ backgroundImage: "url(/img/crowd-nyse.jpg)" }}
       />
+
+      <div data-testid="daily-card" className="rounded-lg border-2 border-ink bg-panel p-4">
+        <div className="flex items-baseline justify-between">
+          <span className="font-display text-xl font-black uppercase tracking-tight">The Daily</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-muted">
+            No.{dailyNumber(today)} &middot; {today}
+          </span>
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-muted">
+          One tape, everyone. One scored attempt. Mis&egrave;re rules: most destroyed wins the day.
+        </p>
+        {dailyResult ? (
+          <div className="mt-3">
+            <div className="font-mono text-sm">
+              {dailyResult.score > 0
+                ? <>destroyed <span className="text-gold">${dailyResult.score.toFixed(2)}</span></>
+                : <>made <span className="text-red">${(-dailyResult.score).toFixed(2)}</span>, regrettably</>}
+              <span className="text-muted"> &middot; streak {stats.streak} &middot; best {stats.best === null ? "—" : money(stats.best)}</span>
+            </div>
+            <button
+              onClick={copyShare}
+              data-testid="share-copy"
+              className="mt-3 w-full rounded-full border border-hair py-3 font-mono text-xs uppercase tracking-widest"
+            >
+              {copied ? "Copied. Spread the damage." : "Copy share card"}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => onPick("daily")}
+            data-testid="mode-daily"
+            className="mt-3 w-full rounded-full bg-ink py-3.5 font-mono text-sm uppercase tracking-widest text-paper"
+          >
+            Play today's tape
+          </button>
+        )}
+      </div>
+
       {MODES.map((m) => (
         <button
           key={m.id}
           data-testid={m.testid}
-          disabled={!m.live}
           onClick={() => onPick(m.id)}
-          className="rounded-lg border border-hair bg-panel p-4 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
+          className="rounded-lg border border-hair bg-panel p-4 text-left transition-transform active:scale-[0.99]"
         >
           <div className="flex items-baseline justify-between">
             <span className="font-display text-xl font-black uppercase tracking-tight" style={{ color: m.id === "normal" ? "var(--p2)" : "var(--gold)" }}>
               {m.title}
             </span>
-            {!m.live && <span className="font-mono text-xs uppercase tracking-widest text-muted">opens late tonight</span>}
           </div>
           <p className="mt-1 text-sm leading-relaxed text-muted">{m.blurb}</p>
         </button>
       ))}
+
+      <Leaderboard refreshKey={refreshKey} />
+      <ResearchPanel identity={identity} refreshKey={refreshKey} />
+
       <Panel className="p-3 text-xs leading-relaxed text-muted">
         House rules: spread &ge; {MIN_SPREAD.toFixed(2)}, quotes within &plusmn;{BAND.toFixed(0)} of the print consensus,
         inventory &plusmn;{INV_CAP}, ~45% sharps. The crowd anchors to exogenous prints, not your fills —
-        the tape-painting ratchet is patched.
+        the tape-painting ratchet is patched. Signed in as <span className="font-mono text-ink">{identity.handle}</span>.
       </Panel>
     </div>
   );

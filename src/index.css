@@ -39,6 +39,12 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
+  /* NYT article register: serif body (Georgia = the native NYT body face) */
+  font-family: georgia, "Times New Roman", serif;
+}
+
+/* UI labels stay Franklin: every uppercase-tracked label is UI, not prose */
+.uppercase {
   font-family: var(--font-sans);
 }
 

@@ -5,10 +5,43 @@ import {
 import type { SoloState } from "../engine/solo";
 import { soloTruePnl, soloBotPnl } from "../engine/solo";
 import { decompose } from "../engine/decompose";
+import { useState } from "react";
+import { shareCard, type DailyStats } from "../data/daily";
+import type { DailyResult } from "./Home";
 import { money, Panel, WBar } from "./atoms";
 import { verdict } from "./verdicts";
 
-export function Recap({ s, mode }: { s: SoloState; mode: "misere" | "normal" }) {
+function DailyShareBlock({ result, stats }: { result: DailyResult; stats: DailyStats }) {
+  const [copied, setCopied] = useState(false);
+  const text = shareCard(result.date, result.score, result.sharp, result.noise, result.inv);
+  return (
+    <Panel className="p-4">
+      <div data-testid="daily-share">
+        <div className="mb-2 text-xs uppercase tracking-widest text-muted">Today's damage report</div>
+        <pre className="overflow-x-auto rounded-md border border-hair bg-panel2 p-3 font-mono text-xs leading-relaxed">{text}</pre>
+        <button
+          onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
+          data-testid="share-copy"
+          className="mt-3 w-full rounded-full bg-ink py-3 font-mono text-xs uppercase tracking-widest text-paper"
+        >
+          {copied ? "Copied. Spread the damage." : "Copy share card"}
+        </button>
+        <div className="mt-3 flex justify-between font-mono text-xs uppercase tracking-widest text-muted">
+          <span>played {stats.played}</span>
+          <span>streak {stats.streak}</span>
+          <span>max {stats.maxStreak}</span>
+          <span>best {stats.best === null ? "—" : money(stats.best)}</span>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+export function Recap({ s, mode, dailyShare }: {
+  s: SoloState;
+  mode: "misere" | "normal";
+  dailyShare?: { result: DailyResult | null; stats: DailyStats };
+}) {
   const misere = mode === "misere";
   const truePnl = soloTruePnl(s);
   const botPnl = soloBotPnl(s);
@@ -79,6 +112,8 @@ export function Recap({ s, mode }: { s: SoloState; mode: "misere" | "normal" }) 
           </ResponsiveContainer>
         </div>
       </Panel>
+
+      {dailyShare?.result && <DailyShareBlock result={dailyShare.result} stats={dailyShare.stats} />}
 
       <Panel className="p-4">
         <div className="text-xs uppercase tracking-widest text-muted">Desk head review</div>

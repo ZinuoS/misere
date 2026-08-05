@@ -55,3 +55,27 @@ Self-reviews per milestone. Newest at the bottom.
 **Smelled wrong:** UnifrakturMaguntia has no true italics/weights and will render fallback-serif if Google Fonts is unreachable — acceptable, masthead-only. Onboarding copy is 3 sentences; timed myself reading it, ~9 seconds.
 
 **Would fix with more time:** self-hosting fonts now matters more (3 families); still deferring to M6 Lighthouse evidence.
+
+## M3 — Handle gate + data layer plumbing
+
+**Built:** compulsory gate (archival hero, mono input, black pill claim). `data/identity.ts`: 32-byte device secret via `crypto.getRandomValues`, SHA-256 via `crypto.subtle`, localStorage persistence, returning-visitor bypass. `data/supabase.ts`: real `@supabase/supabase-js` client behind `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY`; when the env vars are absent every call falls back to a localStorage registry with identical shapes (ponytail-marked — set env vars + run the migration and the file goes live unchanged). Migration at `supabase/migrations/0001_init.sql` includes the amendment: `daily_date` on telemetry + partial unique index `(handle, mode, daily_date)` — one scored daily per day enforced by Postgres — and `submit_game` returns false on the second attempt via unique_violation. Added `my_telemetry` RPC (secret-gated read for the research panel; telemetry has no public select policy).
+
+**States:** gate empty, taken ("Taken. Someone is already losing under that name."), invalid, unreachable; the dry storage sentence is on the gate. e2e covers claim -> wipe identity -> same handle -> taken error -> new handle -> home.
+
+## M3b — The daily, stats, share card (cut-line priority 2)
+
+**Built:** daily card pinned above the modes (No.N from the 2026-08-04 epoch, one scored attempt — replayed attempts blocked client-side by the localStorage result and server-side by the unique index). Daily runs the misère engine with `dateSeed(todayISO)` — everyone gets the bit-identical tape (determinism test from M2R). Recap grows a damage report for dailies: ASCII share card (box drawing + block elements only — passes the emoji grep by construction, unit-tested for it), clipboard copy, Wordle-style stats row (played / streak / max streak / best) computed from telemetry in `data/daily.ts`. Streak logic unit-tested (consecutive-day runs, gap resets, stale-chain zeroing).
+
+## M4 — Competitive modes
+
+**Built:** `CompGame` over the M1 NBBO engine — vs ERIS (her quotes rendered read-only with live inventory) and pass-and-play duel (lock quotes -> pass the phone -> resolve). Comp verdict banner ("X loses best."), per-desk PnL in desk accents, dual-scatter chart. Dummy grew comp rows: dummy-vs-ERIS and dummy-vs-dummy across all three policies, residual checked on BOTH desks — 12 rows total, all at float epsilon.
+
+## M5 — Data layer live (fallback mode)
+
+**Built:** `submit_game` wired on every game end in all four modes (+ daily variant); failures surface a retry toast ("Telemetry lost in the mail.") holding the exact payload — telemetry never silently drops. Leaderboard (top 10 by best_misere, instructive empty state) and research panel (per-mode aggregates + prospect-theory read + raw JSON export) read live rows via the same env-gated client. Smoke e2e: the dummy claims a handle and plays ALL FIVE mode variants through the real UI, asserts the leaderboard row appears with the exact seed-1 score ($102.00), the daily share card renders, and the research panel aggregates both solo modes. Passing on desktop + mobile projects.
+
+**Not done (blocked on provisioning, by design):** the same smoke against a real Supabase project, and M6 (PWA + Lighthouse + Vercel). Zero code changes expected — set the two env vars, run the migration, re-run `npm run e2e`.
+
+**Smelled wrong:** (1) e2e claims write real rows when env vars are set — the M6 production run needs a throwaway handle convention (dummy_*) or a test-data sweep; noted for M6. (2) `my_telemetry` RPC is new surface beyond the original spec — required because telemetry has RLS with no select policy; flagging so it gets reviewed. (3) With `?seed=` pinned, consecutive solo games replay the same tape (component remount resets the offset) — correct for e2e, invisible in production where the clock seeds.
+
+**Would fix with more time:** queue failed submissions in localStorage and flush on reconnect — the PWA offline requirement will force this at M6 anyway; the retry toast covers tonight.

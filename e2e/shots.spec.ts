@@ -3,30 +3,56 @@ import { test, expect, type Page } from "@playwright/test";
 // Milestone screenshots: screenshots/mNN-<state>-<desktop|mobile>.png
 const shot = (name: string, project: string) => `screenshots/${name}-${project}.png`;
 
-// Every test except the onboarding one pre-dismisses the first-visit modal.
 const skipOnboard = (page: Page) =>
   page.addInitScript(() => localStorage.setItem("md:onboard", "1"));
 
-test("m00-shell", async ({ page }, ti) => {
-  await skipOnboard(page);
-  await page.goto("/");
-  await page.screenshot({ path: shot("m00-shell", ti.project.name), fullPage: true });
-});
-
-async function startMisere(page: Page, seed: number, mode = "mode-misere") {
-  await skipOnboard(page);
-  await page.goto(`/?seed=${seed}`);
-  await page.getByTestId(mode).click();
-  await page.getByTestId("tick").waitFor({ timeout: 5000 }); // loading interstitial
+// Fresh context per test: the gate always shows first. Claim through the real UI.
+async function claim(page: Page, handle = "dummy_desk") {
+  await page.getByTestId("gate-input").fill(handle);
+  await page.getByTestId("gate-claim").click();
+  await page.getByTestId("daily-card").waitFor({ timeout: 5000 });
 }
 
-async function playToEnd(page: Page) {
-  for (let i = 0; i < 40; i++) await page.getByTestId("tick").click();
+async function start(page: Page, seed: number, mode: string) {
+  await skipOnboard(page);
+  await page.goto(`/?seed=${seed}`);
+  await claim(page);
+  await page.getByTestId(mode).click();
+  await page.getByTestId(mode === "mode-duel" ? "lock" : "tick").waitFor({ timeout: 5000 });
+}
+
+async function playToEnd(page: Page, ticks = 40) {
+  for (let i = 0; i < ticks; i++) await page.getByTestId("tick").click();
   await expect(page.getByTestId("verdict")).toBeVisible();
 }
 
+test("m00-shell and m03-gate-empty", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.goto("/");
+  await page.getByTestId("gate-input").waitFor();
+  await page.screenshot({ path: shot("m03-gate-empty", ti.project.name), fullPage: true });
+});
+
+test("m03-gate-taken and success", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.goto("/?seed=1");
+  await claim(page, "taken_one");
+  // wipe only the identity: the local registry still holds the handle
+  await page.evaluate(() => localStorage.removeItem("md:id"));
+  await page.reload();
+  await page.getByTestId("gate-input").fill("taken_one");
+  await page.getByTestId("gate-claim").click();
+  await expect(page.getByTestId("gate-error")).toBeVisible();
+  await page.screenshot({ path: shot("m03-gate-taken", ti.project.name), fullPage: true });
+  await page.getByTestId("gate-input").fill("taken_two");
+  await page.getByTestId("gate-claim").click();
+  await page.getByTestId("daily-card").waitFor();
+  await page.screenshot({ path: shot("m03-gate-success", ti.project.name), fullPage: true });
+});
+
 test("m02-onboarding", async ({ page }, ti) => {
   await page.goto("/?seed=1");
+  await claim(page);
   await expect(page.getByTestId("onboard")).toBeVisible();
   await page.screenshot({ path: shot("m02-onboarding", ti.project.name) });
   await page.getByTestId("onboard-dismiss").click();
@@ -36,24 +62,66 @@ test("m02-onboarding", async ({ page }, ti) => {
 test("m02-home", async ({ page }, ti) => {
   await skipOnboard(page);
   await page.goto("/?seed=1");
+  await claim(page);
   await page.screenshot({ path: shot("m02-home", ti.project.name), fullPage: true });
 });
 
 test("m02-midgame", async ({ page }, ti) => {
-  await startMisere(page, 1);
+  await start(page, 1, "mode-misere");
   for (let i = 0; i < 15; i++) await page.getByTestId("tick").click();
   await page.screenshot({ path: shot("m02-midgame", ti.project.name), fullPage: true });
 });
 
 test("m02-verdict-misere-loss and recap decomposition", async ({ page }, ti) => {
-  await startMisere(page, 1);
+  await start(page, 1, "mode-misere");
   await playToEnd(page);
   await page.screenshot({ path: shot("m02-verdict-misere-loss", ti.project.name), fullPage: true });
   await page.getByTestId("decomp").screenshot({ path: shot("m02-recap-decomposition", ti.project.name) });
 });
 
 test("m02-verdict-accidental-profit", async ({ page }, ti) => {
-  await startMisere(page, 35);
+  await start(page, 35, "mode-misere");
   await playToEnd(page);
   await page.screenshot({ path: shot("m02-verdict-accidental-profit", ti.project.name), fullPage: true });
+});
+
+test("m03b-daily-home and share", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.goto("/");
+  await claim(page);
+  await page.screenshot({ path: shot("m03b-daily-home", ti.project.name), fullPage: true });
+  await page.getByTestId("mode-daily").click();
+  await page.getByTestId("tick").waitFor();
+  await playToEnd(page);
+  await expect(page.getByTestId("daily-share")).toBeVisible();
+  await page.screenshot({ path: shot("m03b-daily-share", ti.project.name), fullPage: true });
+});
+
+test("m04-eris-midgame and comp verdict", async ({ page }, ti) => {
+  await start(page, 7, "mode-eris");
+  for (let i = 0; i < 12; i++) await page.getByTestId("tick").click();
+  await page.screenshot({ path: shot("m04-eris-midgame", ti.project.name), fullPage: true });
+  for (let i = 0; i < 13; i++) await page.getByTestId("tick").click();
+  await expect(page.getByTestId("verdict")).toBeVisible();
+  await page.screenshot({ path: shot("m04-comp-verdict", ti.project.name), fullPage: true });
+});
+
+test("m04-duel-handoff", async ({ page }, ti) => {
+  await start(page, 7, "mode-duel");
+  await page.getByTestId("lock").click(); // player 1 locked, phone passes
+  await page.screenshot({ path: shot("m04-duel-handoff", ti.project.name), fullPage: true });
+});
+
+test("m05-leaderboard and research", async ({ page }, ti) => {
+  await start(page, 1, "mode-misere");
+  await playToEnd(page);
+  await page.getByRole("button", { name: /modes/i }).click();
+  await expect(page.getByTestId("leaderboard")).toContainText("dummy_desk");
+  await page.getByTestId("leaderboard").screenshot({ path: shot("m05-leaderboard", ti.project.name) });
+  await page.getByTestId("mode-normal").click();
+  await page.getByTestId("tick").waitFor();
+  await playToEnd(page);
+  await page.getByRole("button", { name: /modes/i }).click();
+  await expect(page.getByTestId("research")).toContainText("misere");
+  await page.getByTestId("research").screenshot({ path: shot("m05-research", ti.project.name) });
 });

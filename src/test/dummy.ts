@@ -6,6 +6,9 @@ import { mulberry32 } from "../engine/rng";
 import {
   adjust, clampMkt, skew, soloInit, soloStep, soloTruePnl, type SoloState,
 } from "../engine/solo";
+import {
+  adjustDesk, compInit, compStep, deskPnl, skewDesk, type CompState,
+} from "../engine/comp";
 import { decompose, residual } from "../engine/decompose";
 import { r2, type Rng } from "../engine/types";
 
@@ -61,12 +64,60 @@ export function runSolo(mode: string, policy: Policy, seed: number): DummyRow {
   return row;
 }
 
+// comp variant of the same three policies, applied to desk i
+export function actComp(policy: Policy, s: CompState, i: number, rng: Rng): void {
+  if (policy === "random-legal") {
+    const n = Math.floor(rng() * 4);
+    for (let k = 0; k < n; k++) {
+      const which = Math.floor(rng() * 3);
+      const d = rng() < 0.5 ? -0.5 : 0.5;
+      if (which === 0) adjustDesk(s, i, "bid", d);
+      else if (which === 1) adjustDesk(s, i, "ask", d);
+      else skewDesk(s, i, d);
+    }
+  } else if (policy === "always-max-skew") {
+    for (let k = 0; k < 20; k++) skewDesk(s, i, 0.5);
+  } else {
+    [s.desks[i].bid, s.desks[i].ask] = clampMkt(r2(s.anchor) - 0.5, r2(s.anchor) + 0.5, s.anchor);
+  }
+}
+
+export function runComp(mode: "eris" | "duel", policy: Policy, seed: number): DummyRow {
+  const row: DummyRow = { mode: mode === "eris" ? "vs-eris" : "duel", policy, ticks: 0, fills: 0, truePnl: 0, residual: 0, error: "" };
+  try {
+    const rng = mulberry32(seed);
+    const s = compInit(["Dummy", mode === "eris" ? "ERIS" : "Dummy2"], mode === "eris");
+    while (!s.done) {
+      actComp(policy, s, 0, rng);
+      if (mode === "duel") actComp(policy, s, 1, rng);
+      compStep(s, rng);
+      row.ticks = s.t;
+    }
+    // residual checked for BOTH desks; row reports desk 0
+    for (const d of s.desks) {
+      const dec = decompose(d.fills, s.vPath, d.invPath, d.quoteLog);
+      const r = residual(deskPnl(d, s.V), dec);
+      row.residual = Math.max(row.residual, r);
+    }
+    row.fills = s.desks[0].fills.length;
+    row.truePnl = deskPnl(s.desks[0], s.V);
+  } catch (e) {
+    row.error = String(e);
+  }
+  return row;
+}
+
 export function runDummy(): DummyRow[] {
   const rows: DummyRow[] = [];
   const modes = ["solo-misere", "solo-normal"];
   modes.forEach((mode, mi) => {
     POLICIES.forEach((policy, pi) => {
       rows.push(runSolo(mode, policy, 1000 + mi * 100 + pi));
+    });
+  });
+  (["eris", "duel"] as const).forEach((mode, mi) => {
+    POLICIES.forEach((policy, pi) => {
+      rows.push(runComp(mode, policy, 2000 + mi * 100 + pi));
     });
   });
   return rows;
