@@ -1,7 +1,8 @@
--- Misère Desk schema. Run once against a fresh Supabase project.
--- All writes go through security-definer RPCs; anon key only ever selects.
+-- Misère Desk schema. Safe to run more than once: re-running an already-installed
+-- schema is a no-op rather than "relation already exists".
+-- All writes go through security-definer RPCs; the anon key only ever selects.
 
-create table players (
+create table if not exists players (
   handle text primary key check (handle ~ '^[a-zA-Z0-9_-]{3,16}$'),
   secret_hash text not null,
   created_at timestamptz default now(),
@@ -10,7 +11,7 @@ create table players (
   games int default 0
 );
 
-create table telemetry (
+create table if not exists telemetry (
   id bigint generated always as identity primary key,
   handle text references players(handle),
   mode text not null,
@@ -21,15 +22,20 @@ create table telemetry (
   created_at timestamptz default now()
 );
 
+-- older installs predate daily_date; add it before the index needs it
+alter table telemetry add column if not exists daily_date date;
+
 -- one scored daily attempt per player per mode per day, enforced by Postgres
-create unique index one_daily_attempt
+create unique index if not exists one_daily_attempt
   on telemetry (handle, mode, daily_date)
   where daily_date is not null;
 
 alter table players enable row level security;
 alter table telemetry enable row level security;
+
+drop policy if exists "public read leaderboard" on players;
 create policy "public read leaderboard" on players for select using (true);
--- no direct insert/update policies: all writes via RPCs below
+-- no direct insert/update policies: all writes via the RPCs below
 
 create or replace function claim_handle(p_handle text, p_secret_hash text)
 returns boolean language plpgsql security definer as $$

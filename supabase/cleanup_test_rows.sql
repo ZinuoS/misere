@@ -1,6 +1,7 @@
 -- Remove throwaway rows left by e2e runs and manual probes.
 -- Run in the Supabase SQL editor whenever the leaderboard needs a clean slate.
 -- e2e handles are prefixed "zz" (see e2e/handle.ts); the probes are named below.
+-- THIS is the file to run to clear the leaderboard - not the migration.
 
 delete from telemetry
 where handle like 'zz%'
