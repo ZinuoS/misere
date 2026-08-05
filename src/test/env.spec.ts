@@ -53,3 +53,23 @@ describe("env value cleaning", () => {
     expect(() => new URL(cleanUrl(`"${u}"`))).not.toThrow();
   });
 });
+
+describe("masked-key detection (the deployed failure)", () => {
+  // Vercel held eyJhbGci + 200 U+2022 BULLET: the dashboard's MASKED display,
+  // copied instead of the value. Cleaning leaves an 8-char stub -> "Invalid API key".
+  const MASKED = "eyJhbGci" + "\u2022".repeat(200);
+
+  it("reproduces it: masked value is header-illegal, and cleans down to a stub", () => {
+    expect(MASKED).toHaveLength(208);       // same length as the real key, so it looks right
+    expect(headerSafe(MASKED)).toBe(false); // the first symptom we saw
+    const cleaned = cleanKey(MASKED);
+    expect(cleaned).toBe("eyJhbGci");       // the second symptom: an 8-char stub
+    expect(cleaned.length).toBeLessThan(40);
+  });
+
+  it("a stripped-majority value is diagnosable as masked, not merely invalid", () => {
+    const stripped = MASKED.length - cleanKey(MASKED).length;
+    expect(stripped).toBeGreaterThan(cleanKey(MASKED).length); // the rule configProblem uses
+    expect(MASKED.length - cleanKey(GOOD).length).toBeGreaterThan(0);
+  });
+});

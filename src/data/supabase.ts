@@ -7,13 +7,17 @@ import type { Identity } from "./identity";
 //   "Failed to execute 'set' on 'Headers': String contains non ISO-8859-1 code point"
 // which reads like a network fault and is not one. Both values have a known, narrow
 // alphabet, so anything outside it is paste damage and is removed.
-const clean = (v: string | undefined, allowed: RegExp): string | undefined => {
+let anonStripped = 0;
+
+const clean = (v: string | undefined, allowed: RegExp, track = false): string | undefined => {
   if (!v) return undefined;
   const trimmed = v.trim().replace(/^['"]|['"]$/g, "");
   const kept = trimmed.replace(allowed, "");
-  if (kept !== trimmed) {
+  const removed = trimmed.length - kept.length;
+  if (track) anonStripped = removed;
+  if (removed) {
     console.warn(
-      `[misere-desk] stripped ${trimmed.length - kept.length} illegal character(s) from an env value; ` +
+      `[misere-desk] stripped ${removed} illegal character(s) from an env value; ` +
         "re-paste it as plain text to silence this.",
     );
   }
@@ -22,7 +26,7 @@ const clean = (v: string | undefined, allowed: RegExp): string | undefined => {
 
 // JWTs and sb_publishable_* keys are base64url plus dots. Nothing else is valid.
 const url = clean(import.meta.env.VITE_SUPABASE_URL as string | undefined, /[^\x21-\x7E]/g);
-const anon = clean(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined, /[^A-Za-z0-9._-]/g);
+const anon = clean(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined, /[^A-Za-z0-9._-]/g, true);
 
 // Un-substituted placeholders are NOT configuration. Without this the app believes
 // it is live, points at a host that does not resolve, and every claim/submit fails.
@@ -33,6 +37,13 @@ export function configProblem(): string {
   if (!url && !anon) return "no VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in this build";
   if (!url) return "VITE_SUPABASE_URL is missing from this build";
   if (!anon) return "VITE_SUPABASE_ANON_KEY is missing from this build";
+  // A dashboard shows the key masked (eyJhbGci••••…). Copying that display instead
+  // of the value stores dots, which we strip — leaving a stub that reads as a plain
+  // "Invalid API key". Name it, because nothing else about it looks wrong.
+  if (anonStripped > anon.length) {
+    return "VITE_SUPABASE_ANON_KEY looks like the MASKED key (dots) - use the dashboard's copy button, do not select the hidden text";
+  }
+  if (anon.length < 40) return `VITE_SUPABASE_ANON_KEY is too short (${anon.length} chars) - it is truncated`;
   if (PLACEHOLDER.test(url) || PLACEHOLDER.test(anon)) return "the env vars still hold placeholder values";
   try {
     const u = new URL(url);
