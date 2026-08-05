@@ -12,3 +12,7 @@ createRoot(document.getElementById('root')!).render(
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'))
 }
+
+if (import.meta.env.PROD) {
+  import('@vercel/speed-insights').then((m) => m.injectSpeedInsights())
+}
