@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { uniqueHandle } from "./handle";
 
 // Milestone screenshots: screenshots/mNN-<state>-<desktop|mobile>.png
 const shot = (name: string, project: string) => `screenshots/${name}-${project}.png`;
@@ -12,7 +13,7 @@ const OPEN_TIME = new Date("2026-08-05T15:00:00Z");
 const openMarket = (page: Page) => page.clock.setFixedTime(OPEN_TIME);
 
 // Fresh context per test: the gate always shows first. Claim through the real UI.
-async function claim(page: Page, handle = "dummy_desk") {
+async function claim(page: Page, handle = uniqueHandle("sh")) {
   await page.getByTestId("gate-input").fill(handle);
   await page.getByTestId("gate-claim").click();
   await page.getByTestId("daily-card").waitFor({ timeout: 5000 });
@@ -41,15 +42,16 @@ test("m00-shell and m03-gate-empty", async ({ page }, ti) => {
 test("m03-gate-taken and success", async ({ page }, ti) => {
   await skipOnboard(page);
   await page.goto("/?seed=1");
-  await claim(page, "taken_one");
+  const taken = uniqueHandle("tk");
+  await claim(page, taken);
   // wipe only the identity: the local registry still holds the handle
   await page.evaluate(() => localStorage.removeItem("md:id"));
   await page.reload();
-  await page.getByTestId("gate-input").fill("taken_one");
+  await page.getByTestId("gate-input").fill(taken);
   await page.getByTestId("gate-claim").click();
   await expect(page.getByTestId("gate-error")).toBeVisible();
   await page.screenshot({ path: shot("m03-gate-taken", ti.project.name), fullPage: true });
-  await page.getByTestId("gate-input").fill("taken_two");
+  await page.getByTestId("gate-input").fill(uniqueHandle("tk2"));
   await page.getByTestId("gate-claim").click();
   await page.getByTestId("daily-card").waitFor();
   await page.screenshot({ path: shot("m03-gate-success", ti.project.name), fullPage: true });
@@ -159,7 +161,7 @@ test("m05-leaderboard and research", async ({ page }, ti) => {
   await start(page, 1, "mode-misere");
   await playToEnd(page);
   await page.getByRole("button", { name: /modes/i }).click();
-  await expect(page.getByTestId("leaderboard")).toContainText("dummy_desk");
+  await expect(page.getByTestId("leaderboard")).toContainText("$102.00");
   await page.getByTestId("leaderboard").screenshot({ path: shot("m05-leaderboard", ti.project.name) });
   await page.getByTestId("mode-normal").click();
   await page.getByTestId("tick").waitFor();

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { uniqueHandle } from "./handle";
 
 // The dummy plays every mode through the real UI and the leaderboard updates.
 // Runs against the local fallback registry; with VITE_SUPABASE_* set it runs
@@ -25,14 +26,15 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("md:onboard", "1"));
   await page.clock.setFixedTime(new Date("2026-08-05T15:00:00Z")); // exchange open
   await page.goto("/?seed=1");
-  await claim(page, "dummy_smoke");
+  const handle = uniqueHandle("sm");
+  await claim(page, handle);
 
   // solo misère (seed 1, hold quotes → known -102.00)
   await page.getByTestId("mode-misere").click();
   await page.getByTestId("tick").waitFor();
   await ticks(page, 40);
   await backToModes(page);
-  await expect(page.getByTestId("leaderboard")).toContainText("dummy_smoke");
+  await expect(page.getByTestId("leaderboard")).toContainText(handle);
   await expect(page.getByTestId("leaderboard")).toContainText("$102.00");
 
   // solo normal

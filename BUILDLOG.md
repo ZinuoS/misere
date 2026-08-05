@@ -161,4 +161,35 @@ Box-drawing and block elements only; the emoji grep passes. Strip is one glyph p
 
 **Also in this pass:** candle-rain personal-best flourish, `© Zinuo Shi` byline, LICENSE, `.env.example`, secure-context handle-claim fix and mobile input hardening (see the commit).
 
-**STILL BLOCKED — not deployed.** `.env.local` holds placeholders, not real Supabase credentials, so the migration has not run against a real project and nothing is deployed. Vercel CLI is not authenticated on this machine (`vercel login` is interactive and cannot be driven from here).
+## M5-live — Supabase project wired and verified
+
+Project `wflzzsjnihtwpxrhixux`. Migration was already applied; probed the live contract directly
+over the REST API before trusting the app to it. Every server-side guarantee in the spec holds:
+
+| Check | Result |
+| --- | --- |
+| `claim_handle` new handle | true |
+| `claim_handle` same handle again | **false** (DB uniqueness, not the client) |
+| `submit_game` with a wrong secret | **false** |
+| `submit_game` practice run | true |
+| `submit_game` daily run | true |
+| `submit_game` SECOND daily, same handle/mode/date | **false** (partial unique index) |
+| leaderboard select | returns the row, score 77 = -pnl |
+| direct `insert into players` with the anon key | **denied**, RLS 42501 |
+| direct `select from telemetry` | **empty** — no public read policy |
+| `my_telemetry` with a wrong secret | empty |
+| `my_telemetry` with the right secret | 2 rows |
+
+The all-mode smoke then ran green against the real project on desktop and mobile: dummy claims a
+handle, plays misère / normal / the daily / ERIS / duel, and the leaderboard row comes back from
+Postgres with the exact seed-1 score.
+
+**Fixed to get there:** e2e used fixed handles, which can only ever be claimed once against a real
+registry — the second project's run failed at the gate. Handles are now generated per run
+(`e2e/handle.ts`, `zz` prefix so throwaway rows are identifiable). `supabase/cleanup_test_rows.sql`
+removes them; the anon key deliberately cannot delete, so that runs in the SQL editor.
+
+**Note on keys:** the anon/publishable key is meant to be public — it is shipped in the client
+bundle by design and RLS is what protects the data. No service-role key was used or needed.
+
+**REMAINING: deploy only.** `.env.local` holds placeholders, not real Supabase credentials, so the migration has not run against a real project and nothing is deployed. Vercel CLI is not authenticated on this machine (`vercel login` is interactive and cannot be driven from here).
