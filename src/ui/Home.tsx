@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BAND, COMP_T, INV_CAP, MIN_SPREAD, SOLO_T } from "../engine/types";
+import { BAND, COMP_T, INV_CAP, MIN_SPREAD, SOLO_T, START, TICK } from "../engine/types";
 import { countdown, dailyNumber, msToNextDaily, type DailyStats } from "../data/daily";
 import { session, SESSION_HOURS } from "../data/market";
 import type { Identity } from "../data/identity";
@@ -154,8 +154,8 @@ export function Home({ onPick, identity, today, dailyResult, stats, refreshKey, 
       <ResearchPanel identity={identity} refreshKey={refreshKey} />
 
       <Panel className="p-3 text-xs leading-relaxed text-muted">
-        House rules: spread &ge; {MIN_SPREAD.toFixed(2)}, quotes within &plusmn;{BAND.toFixed(0)} of the print consensus,
-        inventory &plusmn;{INV_CAP}, ~45% sharps. The crowd anchors to exogenous prints, not your fills —
+        House rules: the book trades around {START}. Ticks of {TICK}, spread floor {MIN_SPREAD},
+        quotes within &plusmn;{BAND} of the print consensus, inventory &plusmn;{INV_CAP}, ~45% sharps. The crowd anchors to exogenous prints, not your fills —
         the tape-painting ratchet is patched. Signed in as <span className="font-mono text-ink">{identity.handle}</span>.
       </Panel>
     </div>

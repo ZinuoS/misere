@@ -41,7 +41,7 @@ const HowDiagram = () => (
 export const HowToPlay = ({ onClose }: { onClose: () => void }) => (
   <Shell testid="onboard" title="How to lose" onClose={onClose}>
     <ul className="mt-3 flex flex-col gap-2 text-sm leading-relaxed">
-      <li><b>Quote.</b> Post a bid and an offer around a fair value you cannot see.</li>
+      <li><b>Quote.</b> Post a bid and an offer around a fair value you cannot see. It drifts every tick.</li>
       <li><b>Get filled.</b> Sharps know that value; noise traders don't. Being picked off is the point.</li>
       <li><b>Lose.</b> 40 ticks. Most money destroyed wins. Profit is failure.</li>
     </ul>

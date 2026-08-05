@@ -51,13 +51,13 @@ export function dailyStats(rows: TelemetryRow[], today: string): DailyStats {
 
 // Histogram over the calibrated tier bands; returns [label, count] rows.
 export const HISTOGRAM_BANDS: [number, number, string][] = [
-  [-Infinity, 1, "made money"],
-  [1, 10, "$1-10"],
-  [10, 25, "$10-25"],
-  [25, 45, "$25-45"],
-  [45, 75, "$45-75"],
-  [75, 150, "$75-150"],
-  [150, Infinity, "$150+"],
+  [-Infinity, 20, "made money"],
+  [20, 150, "$20-150"],
+  [150, 400, "$150-400"],
+  [400, 750, "$400-750"],
+  [750, 1200, "$750-1.2k"],
+  [1200, 2500, "$1.2k-2.5k"],
+  [2500, Infinity, "$2.5k+"],
 ];
 
 export const histogram = (scores: number[]) =>

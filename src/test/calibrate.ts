@@ -39,28 +39,25 @@ const show = (label: string, bands: [number, number, string][]) => {
   }
 };
 
-show("provisional", [
-  [-Infinity, -15, "GENERATIONAL WEALTH (WRONG GAME)"],
-  [-15, -5, "ACCIDENTAL RAINMAKER"],
-  [-5, -1, "SPREAD GOBLIN"],
-  [-1, 1, "EMH (DEROGATORY)"],
-  [1, 8, "PETTY CASH ARSONIST"],
-  [8, 16, "MONEY BURNER"],
-  [16, 25, "GUH."],
-  [25, 35, "CERTIFIED TOXIC"],
-  [35, 45, "SUPERFUND SITE"],
-  [45, Infinity, "FINAL BOSS OF ADVERSE SELECTION"],
+const CUTS = [1, 10, 25, 45, 75, 150];
+console.log("\nold bands at the new scale:");
+show("old", [
+  [-Infinity, -15, "GENERATIONAL WEALTH"], [-15, -5, "RAINMAKER"], [-5, -1, "GOBLIN"],
+  [-1, 1, "EMH"], [1, 10, "PETTY CASH"], [10, 25, "MONEY BURNER"], [25, 45, "GUH."],
+  [45, 75, "CERTIFIED TOXIC"], [75, 150, "SUPERFUND"], [150, Infinity, "FINAL BOSS"],
 ]);
+void CUTS;
 
-show("calibrated", [
-  [-Infinity, -15, "GENERATIONAL WEALTH (WRONG GAME)"],
-  [-15, -5, "ACCIDENTAL RAINMAKER"],
-  [-5, -1, "SPREAD GOBLIN"],
-  [-1, 1, "EMH (DEROGATORY)"],
-  [1, 10, "PETTY CASH ARSONIST"],
-  [10, 25, "MONEY BURNER"],
-  [25, 45, "GUH."],
-  [45, 75, "CERTIFIED TOXIC"],
-  [75, 150, "SUPERFUND SITE"],
-  [150, Infinity, "FINAL BOSS OF ADVERSE SELECTION"],
+// candidate: profit side scaled 10x, loss side pinned to the observed percentiles
+show("calibrated for the 1000-level market", [
+  [-Infinity, -300, "GENERATIONAL WEALTH (WRONG GAME)"],
+  [-300, -100, "ACCIDENTAL RAINMAKER"],
+  [-100, -20, "SPREAD GOBLIN"],
+  [-20, 20, "THE EFFICIENT MARKET HYPOTHESIS"],
+  [20, 150, "PETTY CASH ARSONIST"],
+  [150, 400, "MONEY BURNER"],
+  [400, 750, "GUH."],
+  [750, 1200, "CERTIFIED TOXIC"],
+  [1200, 2500, "SUPERFUND SITE"],
+  [2500, Infinity, "FINAL BOSS OF ADVERSE SELECTION"],
 ]);

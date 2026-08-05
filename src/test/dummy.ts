@@ -10,7 +10,7 @@ import {
   adjustDesk, compInit, compStep, deskPnl, skewDesk, type CompState,
 } from "../engine/comp";
 import { decompose, residual } from "../engine/decompose";
-import { r2, type Rng } from "../engine/types";
+import { r2, TICK, type Rng } from "../engine/types";
 
 export const POLICIES = ["random-legal", "always-max-skew", "spread-floor-camper"] as const;
 export type Policy = (typeof POLICIES)[number];
@@ -21,16 +21,16 @@ export function act(policy: Policy, s: SoloState, rng: Rng): void {
     const n = Math.floor(rng() * 4);
     for (let i = 0; i < n; i++) {
       const k = Math.floor(rng() * 3);
-      const d = rng() < 0.5 ? -0.5 : 0.5;
+      const d = rng() < 0.5 ? -TICK : TICK;
       if (k === 0) adjust(s, "bid", d);
       else if (k === 1) adjust(s, "ask", d);
       else skew(s, d);
     }
   } else if (policy === "always-max-skew") {
-    for (let i = 0; i < 20; i++) skew(s, 0.5); // slams into the band top and stays there
+    for (let i = 0; i < 40; i++) skew(s, TICK); // slams into the band top and stays there
   } else {
     // camper: spread at floor, centered on the anchor
-    [s.bid, s.ask] = clampMkt(r2(s.anchor) - 0.5, r2(s.anchor) + 0.5, s.anchor);
+    [s.bid, s.ask] = clampMkt(r2(s.anchor) - TICK, r2(s.anchor) + TICK, s.anchor);
   }
 }
 
@@ -70,15 +70,15 @@ export function actComp(policy: Policy, s: CompState, i: number, rng: Rng): void
     const n = Math.floor(rng() * 4);
     for (let k = 0; k < n; k++) {
       const which = Math.floor(rng() * 3);
-      const d = rng() < 0.5 ? -0.5 : 0.5;
+      const d = rng() < 0.5 ? -TICK : TICK;
       if (which === 0) adjustDesk(s, i, "bid", d);
       else if (which === 1) adjustDesk(s, i, "ask", d);
       else skewDesk(s, i, d);
     }
   } else if (policy === "always-max-skew") {
-    for (let k = 0; k < 20; k++) skewDesk(s, i, 0.5);
+    for (let k = 0; k < 40; k++) skewDesk(s, i, TICK);
   } else {
-    [s.desks[i].bid, s.desks[i].ask] = clampMkt(r2(s.anchor) - 0.5, r2(s.anchor) + 0.5, s.anchor);
+    [s.desks[i].bid, s.desks[i].ask] = clampMkt(r2(s.anchor) - TICK, r2(s.anchor) + TICK, s.anchor);
   }
 }
 

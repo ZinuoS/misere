@@ -1,5 +1,5 @@
 import {
-  COMP_T, INV_CAP, NOISE_SIGMA, P_INFORMED, PRINT_PROB,
+  COMP_T, INV_CAP, MIN_SPREAD, NOISE_SIGMA, P_INFORMED, PRINT_PROB, PRINT_SIGMA, START,
   r2, type Fill, type QuoteRec, type Rng, type Side, type StepOpts, type TapeEntry,
 } from "./types";
 import { randn } from "./rng";
@@ -30,11 +30,11 @@ export interface CompState {
 }
 
 const mkDesk = (name: string): Desk => ({
-  name, bid: 99, ask: 101, cash: 0, inv: 0, fills: [], invPath: [0], quoteLog: [],
+  name, bid: START - MIN_SPREAD / 2, ask: START + MIN_SPREAD / 2, cash: 0, inv: 0, fills: [], invPath: [0], quoteLog: [],
 });
 
 export const compInit = (names: [string, string], vsBot: boolean): CompState => ({
-  t: 0, V: 100, vPath: [100], lastRef: 100, anchor: 100,
+  t: 0, V: START, vPath: [START], lastRef: START, anchor: START,
   tape: [{ t: 0, text: "Two desks, one tape. Worst P&L wins.", kind: "sys" }],
   desks: [mkDesk(names[0]), mkDesk(names[1])],
   eris: vsBot ? erisInit() : null,
@@ -45,7 +45,7 @@ export function adjustDesk(s: CompState, i: number, which: "bid" | "ask", d: num
   const pl = s.desks[i];
   let bid = pl.bid, ask = pl.ask;
   if (which === "bid") bid = r2(bid + d); else ask = r2(ask + d);
-  if (ask - bid < 1.0 - 1e-9) return;
+  if (ask - bid < MIN_SPREAD - 1e-9) return;
   [pl.bid, pl.ask] = clampMkt(bid, ask, s.anchor);
 }
 
@@ -81,7 +81,7 @@ export function compStep(s: CompState, rng: Rng, opts: StepOpts = {}): void {
   s.V = evolveV(s.V, rng);
 
   if (rng() < printProb) {
-    const pr = Math.round((s.V + randn(rng)) * 100) / 100;
+    const pr = Math.round((s.V + randn(rng) * PRINT_SIGMA) * 100) / 100;
     s.lastRef = pr;
     s.anchor = 0.6 * s.anchor + 0.4 * pr;
     s.tape.push({ t, text: `Print elsewhere @ ${pr.toFixed(2)}`, kind: "print" });
@@ -109,7 +109,7 @@ export function compStep(s: CompState, rng: Rng, opts: StepOpts = {}): void {
       text: `${sharp ? "Sharp" : "Noise"} ${side === "buy" ? "lifts" : "hits"} ${pl.name} @ ${price.toFixed(2)}`,
       kind: sharp ? "sharp" : "noise",
     });
-    if (s.eris && i === 1) s.eris.est += side === "buy" ? 0.3 : -0.3;
+    if (s.eris && i === 1) s.eris.est += (side === "buy" ? 1 : -1) * MIN_SPREAD * 0.3;
     traded = true;
   };
 

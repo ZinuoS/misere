@@ -1,17 +1,18 @@
 import {
-  BAND, INV_CAP, MIN_SPREAD, NOISE_SIGMA, P_INFORMED, PRINT_PROB, SOLO_T,
+  BAND, INV_CAP, JUMP_MIN, JUMP_PROB, JUMP_SPAN, MIN_SPREAD, NOISE_SIGMA, P_INFORMED,
+  PRINT_PROB, PRINT_SIGMA, SOLO_T, START, TICK, V_SIGMA,
   r2, type Fill, type QuoteRec, type Rng, type Side, type StepOpts, type TapeEntry,
 } from "./types";
 import { randn } from "./rng";
 
 export const evolveV = (V: number, rng: Rng) => {
-  let v = V + randn(rng) * 0.8;
-  if (rng() < 0.06) v += (rng() < 0.5 ? -1 : 1) * (2 + rng() * 2);
+  let v = V + randn(rng) * V_SIGMA;
+  if (rng() < JUMP_PROB) v += (rng() < 0.5 ? -1 : 1) * (JUMP_MIN + rng() * JUMP_SPAN);
   return Math.round(v * 100) / 100;
 };
 
-const ceil2 = (x: number) => Math.ceil(x * 2) / 2;
-const floor2 = (x: number) => Math.floor(x * 2) / 2;
+const ceil2 = (x: number) => Math.ceil(x / TICK) * TICK;
+const floor2 = (x: number) => Math.floor(x / TICK) * TICK;
 
 // Band + spread clamp, anchored to the print-only EWMA (tape-painting patch).
 // Band edges snap inward to the 0.5 grid so rounded quotes can never escape
@@ -44,11 +45,11 @@ export interface SoloState {
 }
 
 export const soloInit = (): SoloState => ({
-  t: 0, V: 100, vPath: [100], invPath: [0], lastRef: 100, anchor: 100,
-  bid: 99, ask: 101, cash: 0, inv: 0,
+  t: 0, V: START, vPath: [START], invPath: [0], lastRef: START, anchor: START,
+  bid: START - MIN_SPREAD / 2, ask: START + MIN_SPREAD / 2, cash: 0, inv: 0,
   fills: [], quoteLog: [],
-  tape: [{ t: 0, text: "Session open. Reference print 100.00.", kind: "sys" }],
-  bot: { est: 100, cash: 0, inv: 0 },
+  tape: [{ t: 0, text: `Session open. Reference print ${START.toFixed(2)}.`, kind: "sys" }],
+  bot: { est: START, cash: 0, inv: 0 },
   done: false,
 });
 
@@ -70,7 +71,7 @@ export function soloStep(s: SoloState, rng: Rng, opts: StepOpts = {}): void {
   s.V = evolveV(s.V, rng);
 
   if (rng() < printProb) {
-    const pr = Math.round((s.V + randn(rng)) * 100) / 100;
+    const pr = Math.round((s.V + randn(rng) * PRINT_SIGMA) * 100) / 100;
     s.lastRef = pr;
     s.anchor = 0.6 * s.anchor + 0.4 * pr; // crowd anchors to prints only
     s.tape.push({ t, text: `Print elsewhere @ ${pr.toFixed(2)}`, kind: "print" });
@@ -110,11 +111,11 @@ export function soloStep(s: SoloState, rng: Rng, opts: StepOpts = {}): void {
     }
   } else s.tape.push({ t, text: "No interest in your market.", kind: "sys" });
 
-  const bb = r2(s.bot.est - 0.75), ba = r2(s.bot.est + 0.75);
+  const bb = r2(s.bot.est - MIN_SPREAD * 0.75), ba = r2(s.bot.est + MIN_SPREAD * 0.75);
   const bf = tryFill(bb, ba);
   if (bf) {
-    if (bf.side === "buy") { s.bot.cash += bf.price; s.bot.inv -= 1; s.bot.est += 0.3; }
-    else { s.bot.cash -= bf.price; s.bot.inv += 1; s.bot.est -= 0.3; }
+    if (bf.side === "buy") { s.bot.cash += bf.price; s.bot.inv -= 1; s.bot.est += TICK * 0.6; }
+    else { s.bot.cash -= bf.price; s.bot.inv += 1; s.bot.est -= TICK * 0.6; }
   }
 
   s.vPath.push(s.V);

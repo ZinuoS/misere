@@ -6,7 +6,7 @@ import {
 } from "../engine/comp";
 import { erisQuotes } from "../engine/eris";
 import { decompose, residual } from "../engine/decompose";
-import { BAND, INV_CAP, MIN_SPREAD, r2 } from "../engine/types";
+import { BAND, INV_CAP, MIN_SPREAD, START, TICK, r2 } from "../engine/types";
 import { act, POLICIES } from "./dummy";
 
 const EPS = 1e-9;
@@ -33,7 +33,7 @@ describe("decomposition identity", () => {
       const rng = mulberry32(seed);
       const s = compInit(["A", "ERIS"], true);
       while (!s.done) {
-        skewDesk(s, 0, rng() < 0.5 ? -0.5 : 0.5);
+        skewDesk(s, 0, rng() < 0.5 ? -TICK : TICK);
         compStep(s, rng);
       }
       for (const d of s.desks) {
@@ -48,14 +48,14 @@ describe("clampMkt", () => {
   it("never crossed, never under MIN_SPREAD, never outside the band (10k fuzz)", () => {
     const rng = mulberry32(7);
     for (let i = 0; i < 10_000; i++) {
-      const anchor = 80 + rng() * 40;
-      const bid = anchor - 8 + rng() * 16;
-      const ask = anchor - 8 + rng() * 16;
+      const anchor = START * (0.8 + rng() * 0.4);
+      const bid = anchor - BAND * 2 + rng() * BAND * 4;
+      const ask = anchor - BAND * 2 + rng() * BAND * 4;
       const [b, a] = clampMkt(bid, ask, anchor);
       expect(a - b).toBeGreaterThanOrEqual(MIN_SPREAD - EPS);
       expect(b).toBeGreaterThanOrEqual(anchor - BAND - EPS);
       expect(a).toBeLessThanOrEqual(anchor + BAND + EPS);
-      expect(b).toBe(r2(b)); // on the 0.5 grid
+      expect(b).toBe(r2(b)); // on the quote grid
       expect(a).toBe(r2(a));
     }
   });
@@ -94,23 +94,23 @@ describe("NBBO routing", () => {
   it("strictly better ask always wins the buyer", () => {
     const rng = mulberry32(3);
     for (let i = 0; i < 1000; i++) {
-      expect(routeBuy([mk(99, 100.5), mk(99, 101)], rng)).toBe(0);
-      expect(routeSell([mk(99.5, 101), mk(99, 101)], rng)).toBe(0);
+      expect(routeBuy([mk(995, 1005), mk(995, 1015)], rng)).toBe(0);
+      expect(routeSell([mk(1005, 1015), mk(995, 1015)], rng)).toBe(0);
     }
   });
 
   it("desks at the inventory cap are ineligible", () => {
     const rng = mulberry32(4);
-    expect(routeBuy([mk(99, 100, -INV_CAP), mk(99, 101)], rng)).toBe(1);
-    expect(routeSell([mk(100, 101, INV_CAP), mk(99, 101)], rng)).toBe(1);
-    expect(routeBuy([mk(99, 100, -INV_CAP), mk(99, 101, -INV_CAP)], rng)).toBeNull();
+    expect(routeBuy([mk(995, 1005, -INV_CAP), mk(995, 1015)], rng)).toBe(1);
+    expect(routeSell([mk(1005, 1015, INV_CAP), mk(995, 1015)], rng)).toBe(1);
+    expect(routeBuy([mk(995, 1005, -INV_CAP), mk(995, 1015, -INV_CAP)], rng)).toBeNull();
   });
 
   it("ties split ~50/50 over 10k seeded draws (chi-squared)", () => {
     const rng = mulberry32(5);
     let wins0 = 0;
     for (let i = 0; i < 10_000; i++) {
-      if (routeBuy([mk(99, 101), mk(99, 101)], rng) === 0) wins0++;
+      if (routeBuy([mk(995, 1015), mk(995, 1015)], rng) === 0) wins0++;
     }
     const chi2 = (wins0 - 5000) ** 2 / 5000 + (10_000 - wins0 - 5000) ** 2 / 5000;
     expect(chi2).toBeLessThan(6.635); // p = 0.01, 1 dof
@@ -175,11 +175,11 @@ describe("ERIS", () => {
 
   it("flips sides two lots before the inventory cap", () => {
     const noFlip = () => 0.5; // rng that never triggers the 10% random flip
-    const long = { est: 100, side: "high" as const };
-    erisQuotes(long, INV_CAP - 2, 100, noFlip);
+    const long = { est: START, side: "high" as const };
+    erisQuotes(long, INV_CAP - 2, START, noFlip);
     expect(long.side).toBe("low"); // near-long-cap: quote low to sell down
-    const short = { est: 100, side: "low" as const };
-    erisQuotes(short, -(INV_CAP - 2), 100, noFlip);
+    const short = { est: START, side: "low" as const };
+    erisQuotes(short, -(INV_CAP - 2), START, noFlip);
     expect(short.side).toBe("high");
   });
 });

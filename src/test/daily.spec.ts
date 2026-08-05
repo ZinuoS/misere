@@ -50,11 +50,11 @@ describe("daily", () => {
   });
 
   it("histogram bins scores across the calibrated bands", () => {
-    const h = histogram([-3, 5, 20, 200]);
+    const h = histogram([-30, 50, 200, 3000]);
     expect(h.find((b) => b.label === "made money")!.n).toBe(1);
-    expect(h.find((b) => b.label === "$1-10")!.n).toBe(1);
-    expect(h.find((b) => b.label === "$10-25")!.n).toBe(1);
-    expect(h.find((b) => b.label === "$150+")!.n).toBe(1);
+    expect(h.find((b) => b.label === "$20-150")!.n).toBe(1);
+    expect(h.find((b) => b.label === "$150-400")!.n).toBe(1);
+    expect(h.find((b) => b.label === "$2.5k+")!.n).toBe(1);
   });
 
   it("share card is emoji-free, carries the decomposition and the site URL", () => {
@@ -70,16 +70,16 @@ describe("daily", () => {
 describe("verdict ladder", () => {
   it("every calibrated misère band is reachable and uses the spec copy", () => {
     const cases: [number, string][] = [
-      [200, "FINAL BOSS OF ADVERSE SELECTION"],
-      [100, "SUPERFUND SITE"],
-      [50, "CERTIFIED TOXIC"],
-      [30, "GUH."],
-      [15, "MONEY BURNER"],
-      [5, "PETTY CASH ARSONIST"],
+      [3000, "FINAL BOSS OF ADVERSE SELECTION"],
+      [1500, "SUPERFUND SITE"],
+      [900, "CERTIFIED TOXIC"],
+      [500, "GUH."],
+      [200, "MONEY BURNER"],
+      [50, "PETTY CASH ARSONIST"],
       [0, "THE EFFICIENT MARKET HYPOTHESIS (DEROGATORY)"],
-      [-3, "SPREAD GOBLIN"],
-      [-10, "ACCIDENTAL RAINMAKER"],
-      [-40, "GENERATIONAL WEALTH (WRONG GAME)"],
+      [-50, "SPREAD GOBLIN"],
+      [-150, "ACCIDENTAL RAINMAKER"],
+      [-400, "GENERATIONAL WEALTH (WRONG GAME)"],
     ];
     for (const [score, headline] of cases) {
       expect(verdict("misere", score, dec()).headline).toBe(headline);
@@ -88,11 +88,11 @@ describe("verdict ladder", () => {
 
   it("normal ladder covers its five bands", () => {
     const cases: [number, string][] = [
-      [30, "THE DESK HEAD NODS ONCE"],
-      [15, "SPREAD FARMER"],
-      [5, "PAPER CUT PROFITS"],
-      [-5, "TUITION PAID"],
-      [-30, "EXIT LIQUIDITY"],
+      [500, "THE DESK HEAD NODS ONCE"],
+      [200, "SPREAD FARMER"],
+      [50, "PAPER CUT PROFITS"],
+      [-50, "TUITION PAID"],
+      [-300, "EXIT LIQUIDITY"],
     ];
     for (const [score, headline] of cases) {
       expect(verdict("normal", score, dec()).headline).toBe(headline);
@@ -106,15 +106,15 @@ describe("verdict ladder", () => {
 
   it("stamps fire on constructed cases, at most one", () => {
     // inventory drives >60% of losses
-    const inv = verdict("misere", 50, dec({ invPnl: -80, sharpEdge: -10, noiseEdge: -10 }));
+    const inv = verdict("misere", 900, dec({ invPnl: -80, sharpEdge: -10, noiseEdge: -10 }));
     expect(inv.stamp).toBe("LUCK, NOT CRAFT — INVENTORY DID THIS");
     // sharps drive >70% with 5+ sharp fills
-    const sharp = verdict("misere", 50, dec({ sharpEdge: -80, noiseEdge: -10, invPnl: -5, nSharp: 5 }));
+    const sharp = verdict("misere", 900, dec({ sharpEdge: -80, noiseEdge: -10, invPnl: -5, nSharp: 5 }));
     expect(sharp.stamp).toBe("PRECISION INSTRUMENT");
     // same shape but only 4 sharp fills: no stamp
-    expect(verdict("misere", 50, dec({ sharpEdge: -80, noiseEdge: -10, invPnl: -5, nSharp: 4 })).stamp).toBeUndefined();
+    expect(verdict("misere", 900, dec({ sharpEdge: -80, noiseEdge: -10, invPnl: -5, nSharp: 4 })).stamp).toBeUndefined();
     // a profitable desk never gets a loss stamp
-    expect(stampFor(dec({ invPnl: -80 }), -5)).toBeUndefined();
+    expect(stampFor(dec({ invPnl: -80 }), -50)).toBeUndefined();
     // ghost desk never stamps
     expect(verdict("misere", 0, dec({ nFills: 0 })).stamp).toBeUndefined();
   });

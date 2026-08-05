@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchLeaderboard, fetchMyTelemetry, type LeaderRow, type TelemetryRow } from "../data/supabase";
-import { sha256Hex, type Identity } from "../data/identity";
+import type { Identity } from "../data/identity";
 import { Panel } from "./atoms";
 
 export function Leaderboard({ refreshKey }: { refreshKey: number }) {
@@ -35,7 +35,7 @@ export function ResearchPanel({ identity, refreshKey }: { identity: Identity; re
   useEffect(() => {
     (async () => {
       try {
-        setRows(await fetchMyTelemetry(identity, await sha256Hex(identity.secret)));
+        setRows(await fetchMyTelemetry(identity));
       } catch {
         setRows([]);
       }

@@ -17,59 +17,60 @@ const DIMS: Record<string, [number, number]> = {
   "/img/brokers-curb.jpg": [800, 624],
 };
 
-// Misère ladder. Bands calibrated over 1,000 seeded dummy games (see BUILDLOG);
+// Misère ladder. Bands re-calibrated over 1,000 seeded dummy games after the market
+// moved to the 1000 level (see BUILDLOG);
 // `lo` is the inclusive floor on score = money destroyed.
 const MISERE: { lo: number; headline: string; sub: string; img: string }[] = [
   {
-    lo: 150,
+    lo: 2500,
     headline: "FINAL BOSS OF ADVERSE SELECTION",
     sub: "You found fair value, looked it in the eye, and quoted its opposite. The sharps light candles for you.",
     img: "/img/breadline.jpg",
   },
   {
-    lo: 75,
+    lo: 1200,
     headline: "SUPERFUND SITE",
     sub: "Your order flow requires federal environmental remediation.",
     img: "/img/breadline.jpg",
   },
   {
-    lo: 45,
+    lo: 750,
     headline: "CERTIFIED TOXIC",
     sub: "Flow desks would pay for the privilege of trading against you.",
     img: "/img/bank-run.jpg",
   },
   {
-    lo: 25,
+    lo: 400,
     headline: "GUH.",
     sub: "That sound was your P&L. Somewhere, a risk officer felt a disturbance.",
     img: "/img/bank-run.jpg",
   },
   {
-    lo: 10,
+    lo: 150,
     headline: "MONEY BURNER",
     sub: "Not a leak. A policy. The desk now doubles as a space heater.",
     img: "/img/crowd-nyse.jpg",
   },
   {
-    lo: 1,
+    lo: 20,
     headline: "PETTY CASH ARSONIST",
     sub: "You lost lunch money. The sharps barely noticed the donation.",
     img: "/img/crowd-nyse.jpg",
   },
   {
-    lo: -1,
+    lo: -20,
     headline: "THE EFFICIENT MARKET HYPOTHESIS (DEROGATORY)",
     sub: "Perfectly colourless. No alpha, no anti-alpha, no pulse. The market forgot you were here.",
     img: "/img/curb-market.jpg",
   },
   {
-    lo: -5,
+    lo: -100,
     headline: "SPREAD GOBLIN",
     sub: "You farmed the noise flow like a common market maker. Have you no shame.",
     img: "/img/curb-market.jpg",
   },
   {
-    lo: -15,
+    lo: -300,
     headline: "ACCIDENTAL RAINMAKER",
     sub: "You accidentally ran a profitable desk. Delete your terminal.",
     img: "/img/brokers-curb.jpg",
@@ -83,10 +84,10 @@ const MISERE: { lo: number; headline: string; sub: string; img: string }[] = [
 ];
 
 const NORMAL: { lo: number; headline: string; sub: string; img: string }[] = [
-  { lo: 25, headline: "THE DESK HEAD NODS ONCE", sub: "Highest honor available. Do not ask for more.", img: "/img/brokers-curb.jpg" },
-  { lo: 10, headline: "SPREAD FARMER", sub: "Honest work. The noise thanks you for your service.", img: "/img/curb-market.jpg" },
-  { lo: 1, headline: "PAPER CUT PROFITS", sub: "Technically green. Emotionally beige.", img: "/img/curb-market.jpg" },
-  { lo: -10, headline: "TUITION PAID", sub: "The market taught. You paid. Standard rates.", img: "/img/crowd-nyse.jpg" },
+  { lo: 400, headline: "THE DESK HEAD NODS ONCE", sub: "Highest honor available. Do not ask for more.", img: "/img/brokers-curb.jpg" },
+  { lo: 150, headline: "SPREAD FARMER", sub: "Honest work. The noise thanks you for your service.", img: "/img/curb-market.jpg" },
+  { lo: 20, headline: "PAPER CUT PROFITS", sub: "Technically green. Emotionally beige.", img: "/img/curb-market.jpg" },
+  { lo: -150, headline: "TUITION PAID", sub: "The market taught. You paid. Standard rates.", img: "/img/crowd-nyse.jpg" },
   { lo: -Infinity, headline: "EXIT LIQUIDITY", sub: "The sharps saw you coming from three ticks away. You were the product.", img: "/img/bank-run.jpg" },
 ];
 

@@ -214,3 +214,57 @@ String contains non ISO-8859-1 code point
 **Test-data debt this exposed.** Every e2e run plays the same seed, so every throwaway row scores exactly $102.00. Ten tied rows now saturate the top-10 leaderboard, and the smoke test's "this handle appears on the board" assertion became order-dependent and flaky. Rewritten to assert what it actually means: the board renders real server rows, and the *per-handle* write is proven via the research panel, which reads `my_telemetry` scoped to that handle's secret (n=2 misère, n=1 normal). `supabase/cleanup_test_rows.sql` must be run before launch.
 
 **REMAINING: deploy only.** `.env.local` holds placeholders, not real Supabase credentials, so the migration has not run against a real project and nothing is deployed. Vercel CLI is not authenticated on this machine (`vercel login` is interactive and cannot be driven from here).
+
+## Post-launch — accounts and a bigger, harder market
+
+**Password accounts (no email).** The gate now takes a handle AND a password; the same pair
+signs back in from any device instead of stranding the handle in one browser's localStorage.
+The password is never sent or stored: the client derives PBKDF2-SHA256, 150k iterations, salted
+per handle, and only that hash reaches the server — so `claim_handle` and `submit_game` are
+unchanged. One new RPC, `verify_login` (migration `0002_login.sql`), answers whether a
+handle+hash pair exists. One button covers both paths: log in if the pair matches, claim the
+handle if it is free, and say "taken, wrong password" otherwise. Added a sign-out control so a
+shared phone can switch desks. Pre-password identities (random device secret, no password) are
+dropped on load and re-claimed.
+
+`ponytail:` the login RPC has no server-side rate limit — the 150k-iteration derivation is the
+only brute-force cost. Fine for a game; add pg rate limiting if it ever matters.
+
+**The market moved to the 1000 level, and got harder.** Player feedback was that the game had
+become solvable — the optimal misère line was obvious after a few runs. Pure rescaling would not
+have fixed that, so volatility rose *relative* to the band as well:
+
+| | before | after |
+| --- | --- | --- |
+| start / fair value | 100 | **1000** |
+| quote tick | 0.5 | **5** |
+| spread floor | 1.0 | **10** |
+| band | ±4 | **±60** |
+| fair-value sigma per tick | 0.8 | **14** |
+| jump | 6%, 2-4 | **8%, 25-60** |
+| band : sigma | 5.0 | **4.3** |
+
+A quote parked at the band edge no longer stays right for long, which is what made the old
+balance readable. Prices render with thousands separators.
+
+**The dependency this created, flagged before it bit:** verdict tiers are absolute dollar
+amounts. Re-running the 1,000-game calibration on the new engine showed the old ladder putting
+**61.4% of games in the apex tier** — the game would have told nearly every player they were the
+FINAL BOSS. Re-calibrated (n=1000, median 371, p99 2817):
+
+| Tier | New floor | Share | Percentile |
+| --- | --- | --- | --- |
+| PETTY CASH ARSONIST | 20 | 7.2% | to p38.6 |
+| MONEY BURNER | 150 | 13.3% | to p51.9 |
+| GUH. | 400 | 14.9% | to p66.8 |
+| CERTIFIED TOXIC | 750 | 14.3% | to p81.1 |
+| SUPERFUND SITE | 1200 | 16.0% | to p97.1 |
+| FINAL BOSS OF ADVERSE SELECTION | 2500 | 2.9% | p97.1 and up |
+
+Modal outcome lands on MONEY BURNER (position 6 of 10, mid-ladder), apex at p97.1, every tier
+reachable. Normal ladder and the stats histogram scaled to match.
+
+**Verification:** 36 unit tests, dummy 13 rows / 0 failures with residuals at 1e-13, 28
+screenshots, and the all-mode smoke green. The smoke and screenshots were run against the LOCAL
+fallback because `verify_login` does not exist in the live project yet — confirmed by probe
+(`PGRST202`). Run `supabase/migrations/0002_login.sql` and the live path works unchanged.

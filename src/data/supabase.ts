@@ -135,6 +135,18 @@ const write = (k: string, v: unknown) => localStorage.setItem(k, JSON.stringify(
 
 type LocalPlayers = Record<string, { secret_hash: string; best_misere: number | null; best_normal: number | null; games: number }>;
 
+export async function verifyLogin(handle: string, secretHash: string): Promise<boolean> {
+  const sbp = getSb();
+  if (sbp) {
+    const sb = await sbp;
+    const { data, error } = await sb.rpc("verify_login", { p_handle: handle, p_secret_hash: secretHash });
+    if (error) throw error;
+    return data === true;
+  }
+  const players = read<LocalPlayers>(LB, {});
+  return players[handle]?.secret_hash === secretHash;
+}
+
 export async function claimHandle(handle: string, secretHash: string): Promise<boolean> {
   const sbp = getSb();
   if (sbp) {
@@ -150,7 +162,8 @@ export async function claimHandle(handle: string, secretHash: string): Promise<b
   return true;
 }
 
-export async function submitGame(id: Identity, secretHash: string, r: GameReport): Promise<boolean> {
+export async function submitGame(id: Identity, r: GameReport): Promise<boolean> {
+  const secretHash = id.secretHash;
   const sbp = getSb();
   if (sbp) {
     const sb = await sbp;
@@ -199,7 +212,8 @@ export async function fetchLeaderboard(): Promise<LeaderRow[]> {
     .slice(0, 10);
 }
 
-export async function fetchMyTelemetry(id: Identity, secretHash: string): Promise<TelemetryRow[]> {
+export async function fetchMyTelemetry(id: Identity): Promise<TelemetryRow[]> {
+  const secretHash = id.secretHash;
   const sbp = getSb();
   if (sbp) {
     const sb = await sbp;

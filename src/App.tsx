@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { dateSeed } from "./engine/rng";
-import { getIdentity, sha256Hex, type Identity } from "./data/identity";
+import { clearIdentity, getIdentity, type Identity } from "./data/identity";
 import { fetchMyTelemetry, submitGame, type GameReport } from "./data/supabase";
 import { clearQueue, enqueue, queued } from "./data/queue";
 import { dailyStats, todayISO, type DailyStats } from "./data/daily";
@@ -61,7 +61,7 @@ export default function App() {
     if (!identity) return;
     (async () => {
       try {
-        setStats(dailyStats(await fetchMyTelemetry(identity, await sha256Hex(identity.secret)), today));
+        setStats(dailyStats(await fetchMyTelemetry(identity), today));
       } catch { /* stats stay empty; not worth a toast */ }
     })();
   }, [identity, refreshKey, today]);
@@ -71,10 +71,9 @@ export default function App() {
     if (!identity) return;
     const q = await queued().catch(() => [] as GameReport[]);
     if (!q.length) return;
-    const hash = await sha256Hex(identity.secret);
     const failed: GameReport[] = [];
     for (const r of q) {
-      try { await submitGame(identity, hash, r); } catch { failed.push(r); }
+      try { await submitGame(identity, r); } catch { failed.push(r); }
     }
     await clearQueue();
     for (const r of failed) await enqueue(r);
@@ -98,7 +97,7 @@ export default function App() {
       setDailyResult(result);
     }
     try {
-      await submitGame(identity, await sha256Hex(identity.secret), r);
+      await submitGame(identity, r);
       setRefreshKey((k) => k + 1);
     } catch {
       await enqueue(r); // telemetry must never silently drop
@@ -144,6 +143,15 @@ export default function App() {
             {mode && (
               <button onClick={() => setMode(null)} className="min-h-11 px-2 text-xs uppercase tracking-widest text-muted">
                 &larr; modes
+              </button>
+            )}
+            {identity && !mode && (
+              <button
+                onClick={() => { clearIdentity(); setIdentity(null); setMode(null); }}
+                data-testid="signout"
+                className="min-h-11 px-2 text-xs uppercase tracking-widest text-muted"
+              >
+                sign out
               </button>
             )}
             {identity && (

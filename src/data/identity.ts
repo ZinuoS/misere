@@ -1,6 +1,7 @@
 export interface Identity {
   handle: string;
-  secret: string; // 32-byte hex device secret; hash goes to the server
+  /** PBKDF2 of the password — the same value the server stores. Never the password. */
+  secretHash: string;
 }
 
 const KEY = "md:id";
@@ -8,14 +9,18 @@ const KEY = "md:id";
 export const getIdentity = (): Identity | null => {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Identity) : null;
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<Identity> & { secret?: string };
+    // pre-password identities stored a random device secret; they cannot log in
+    // on another device, so drop them and let the player claim with a password.
+    return v.handle && v.secretHash ? { handle: v.handle, secretHash: v.secretHash } : null;
   } catch {
     return null;
   }
 };
 
-export const saveIdentity = (id: Identity) =>
-  localStorage.setItem(KEY, JSON.stringify(id));
+export const saveIdentity = (id: Identity) => localStorage.setItem(KEY, JSON.stringify(id));
+export const clearIdentity = () => localStorage.removeItem(KEY);
 
 // crypto.subtle exists only in a secure context (https, or localhost). Over plain
 // http on a LAN address it is undefined, which used to surface as a misleading
@@ -30,15 +35,31 @@ export class InsecureContextError extends Error {
   }
 }
 
-export const newSecret = (): string => {
-  const b = crypto.getRandomValues(new Uint8Array(32));
-  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
-};
+const hex = (b: ArrayBuffer) =>
+  Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, "0")).join("");
 
-export async function sha256Hex(s: string): Promise<string> {
+/**
+ * Password -> stored hash. PBKDF2-SHA256, 150k iterations, salted per handle so
+ * two players with the same password get different hashes and one rainbow table
+ * cannot cover the table. WebCrypto only, no dependency.
+ * ponytail: no server-side rate limit on the login RPC — the cost here is the
+ * only brute-force barrier. Add pg rate limiting if the game ever matters.
+ */
+export async function derive(handle: string, password: string): Promise<string> {
   if (!cryptoAvailable()) throw new InsecureContextError();
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(d), (x) => x.toString(16).padStart(2, "0")).join("");
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: enc.encode(`misere-desk:${handle.toLowerCase()}`),
+      iterations: 150_000,
+      hash: "SHA-256",
+    },
+    key,
+    256,
+  );
+  return hex(bits);
 }
 
 // iOS keyboards add autocapitalised letters, smart punctuation and trailing
@@ -46,3 +67,4 @@ export async function sha256Hex(s: string): Promise<string> {
 export const sanitizeHandle = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 16);
 
 export const HANDLE_RE = /^[a-zA-Z0-9_-]{3,16}$/;
+export const MIN_PASSWORD = 6;

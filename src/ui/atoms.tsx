@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
-import { MIN_SPREAD, type TapeEntry } from "../engine/types";
+import { MIN_SPREAD, TICK, type TapeEntry } from "../engine/types";
 
-export const money = (x: number) =>
-  (x >= 0 ? "+$" : "−$") + Math.abs(x).toFixed(2);
+const GROUPED = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export const money = (x: number) => (x >= 0 ? "+$" : "−$") + GROUPED.format(Math.abs(x));
+export const price = (x: number) => GROUPED.format(x);
 
 export const Stat = ({ label, value, color }: { label: string; value: string; color?: string }) => (
   <div className="flex flex-col items-start">
@@ -49,15 +51,15 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
     <div className="rounded-lg border bg-panel p-4" style={{ borderColor: readOnly ? "var(--hair)" : accent }}>
       <div className="mb-2 flex justify-between text-xs uppercase tracking-widest text-muted">
         <span style={{ color: accent }}>{title}</span>
-        <span>ref <span className="font-mono text-ink">{ref_.toFixed(2)}</span></span>
+        <span>ref <span className="font-mono text-ink">{price(ref_)}</span></span>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex flex-col items-center gap-2">
-          <span className="font-mono text-2xl text-bid">{bid.toFixed(2)}</span>
+          <span className="font-mono text-2xl text-bid">{price(bid)}</span>
           {!readOnly && (
             <div className="flex gap-2">
-              <QBtn tone="var(--bid)" onClick={() => onAdj!("bid", -0.5)}>&minus;</QBtn>
-              <QBtn tone="var(--bid)" onClick={() => onAdj!("bid", 0.5)}>+</QBtn>
+              <QBtn tone="var(--bid)" onClick={() => onAdj!("bid", -TICK)}>&minus;</QBtn>
+              <QBtn tone="var(--bid)" onClick={() => onAdj!("bid", TICK)}>+</QBtn>
             </div>
           )}
           <span className="text-xs uppercase tracking-widest text-muted">bid</span>
@@ -65,24 +67,24 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
         <div className="flex flex-col items-center">
           <span className="text-xs uppercase tracking-widest text-muted">spread</span>
           <span className={`font-mono ${ask - bid <= MIN_SPREAD + 1e-9 ? "text-gold" : "text-ink"}`}>
-            {(ask - bid).toFixed(2)}
+            {price(ask - bid)}
           </span>
           {!readOnly && (
             <>
               <div className="mt-2 flex gap-2">
-                <QBtn tone="var(--ink)" onClick={() => onSkew!(-0.5)}>&laquo;</QBtn>
-                <QBtn tone="var(--ink)" onClick={() => onSkew!(0.5)}>&raquo;</QBtn>
+                <QBtn tone="var(--ink)" onClick={() => onSkew!(-TICK)}>&laquo;</QBtn>
+                <QBtn tone="var(--ink)" onClick={() => onSkew!(TICK)}>&raquo;</QBtn>
               </div>
               <span className="mt-1 text-xs text-muted">skew</span>
             </>
           )}
         </div>
         <div className="flex flex-col items-center gap-2">
-          <span className="font-mono text-2xl text-ask">{ask.toFixed(2)}</span>
+          <span className="font-mono text-2xl text-ask">{price(ask)}</span>
           {!readOnly && (
             <div className="flex gap-2">
-              <QBtn tone="var(--ask)" onClick={() => onAdj!("ask", -0.5)}>&minus;</QBtn>
-              <QBtn tone="var(--ask)" onClick={() => onAdj!("ask", 0.5)}>+</QBtn>
+              <QBtn tone="var(--ask)" onClick={() => onAdj!("ask", -TICK)}>&minus;</QBtn>
+              <QBtn tone="var(--ask)" onClick={() => onAdj!("ask", TICK)}>+</QBtn>
             </div>
           )}
           <span className="text-xs uppercase tracking-widest text-muted">offer</span>
