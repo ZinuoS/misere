@@ -50,13 +50,41 @@ test("m03-gate-taken and success", async ({ page }, ti) => {
   await page.screenshot({ path: shot("m03-gate-success", ti.project.name), fullPage: true });
 });
 
-test("m02-onboarding", async ({ page }, ti) => {
+test("m05b-how-to-play", async ({ page }, ti) => {
   await page.goto("/?seed=1");
   await claim(page);
   await expect(page.getByTestId("onboard")).toBeVisible();
-  await page.screenshot({ path: shot("m02-onboarding", ti.project.name) });
+  await page.screenshot({ path: shot("m05b-how-to-play", ti.project.name) });
   await page.getByTestId("onboard-dismiss").click();
   await expect(page.getByTestId("onboard")).not.toBeVisible();
+  // reachable again from the "?" control
+  await page.getByTestId("help").click();
+  await expect(page.getByTestId("onboard")).toBeVisible();
+});
+
+test("m05b-daily-results-and-stats", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.goto("/");
+  await claim(page);
+  await page.getByTestId("mode-daily").click();
+  await page.getByTestId("tick").waitFor();
+  await playToEnd(page);
+  await expect(page.getByTestId("daily-share")).toBeVisible();
+  await expect(page.getByTestId("countdown")).toContainText("next daily in");
+  await page.screenshot({ path: shot("m05b-daily-results", ti.project.name), fullPage: true });
+  await page.getByTestId("open-stats").click();
+  await expect(page.getByTestId("stats")).toBeVisible();
+  await page.screenshot({ path: shot("m05b-stats-modal", ti.project.name) });
+});
+
+test("m02-verdict-stamp", async ({ page }, ti) => {
+  // seed 1 is inventory-dominated: the LUCK, NOT CRAFT stamp should fire
+  await start(page, 1, "mode-misere");
+  await playToEnd(page);
+  const stamp = page.getByTestId("stamp");
+  if (await stamp.count()) {
+    await page.getByTestId("verdict").screenshot({ path: shot("m02-verdict-stamp", ti.project.name) });
+  }
 });
 
 test("m02-home", async ({ page }, ti) => {
@@ -85,16 +113,11 @@ test("m02-verdict-accidental-profit", async ({ page }, ti) => {
   await page.screenshot({ path: shot("m02-verdict-accidental-profit", ti.project.name), fullPage: true });
 });
 
-test("m03b-daily-home and share", async ({ page }, ti) => {
+test("m03b-daily-home", async ({ page }, ti) => {
   await skipOnboard(page);
   await page.goto("/");
   await claim(page);
   await page.screenshot({ path: shot("m03b-daily-home", ti.project.name), fullPage: true });
-  await page.getByTestId("mode-daily").click();
-  await page.getByTestId("tick").waitFor();
-  await playToEnd(page);
-  await expect(page.getByTestId("daily-share")).toBeVisible();
-  await page.screenshot({ path: shot("m03b-daily-share", ti.project.name), fullPage: true });
 });
 
 test("m04-eris-midgame and comp verdict", async ({ page }, ti) => {

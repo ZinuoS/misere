@@ -1,18 +1,24 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { SoloState } from "../engine/solo";
 import { soloTruePnl, soloBotPnl } from "../engine/solo";
-import { decompose } from "../engine/decompose";
-import { useState } from "react";
-import { shareCard, type DailyStats } from "../data/daily";
+import { decompose, type Decomposition } from "../engine/decompose";
+import { countdown, msToNextDaily, shareCard, SITE_URL, type DailyStats } from "../data/daily";
 import type { DailyResult } from "./Home";
 import { money, Panel, WBar } from "./atoms";
 import { verdict } from "./verdicts";
 
 const Chart = lazy(() => import("./Chart"));
 
-function DailyShareBlock({ result, stats }: { result: DailyResult; stats: DailyStats }) {
+function DailyShareBlock({ result, dec, onStats }: {
+  result: DailyResult; dec: Decomposition; onStats: () => void;
+}) {
   const [copied, setCopied] = useState(false);
-  const text = shareCard(result.date, result.score, result.sharp, result.noise, result.inv);
+  const [left, setLeft] = useState(msToNextDaily());
+  useEffect(() => {
+    const id = setInterval(() => setLeft(msToNextDaily()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const text = shareCard(result.date, result.score, dec, SITE_URL);
   return (
     <Panel className="p-4">
       <div data-testid="daily-share">
@@ -21,32 +27,37 @@ function DailyShareBlock({ result, stats }: { result: DailyResult; stats: DailyS
         <button
           onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
           data-testid="share-copy"
-          className="mt-3 w-full rounded-full bg-ink py-3 font-mono text-xs uppercase tracking-widest text-paper"
+          className="mt-3 w-full rounded-full bg-ink py-3.5 font-mono text-xs uppercase tracking-widest text-paper"
         >
           {copied ? "Copied. Spread the damage." : "Copy share card"}
         </button>
-        <div className="mt-3 flex justify-between font-mono text-xs uppercase tracking-widest text-muted">
-          <span>played {stats.played}</span>
-          <span>streak {stats.streak}</span>
-          <span>max {stats.maxStreak}</span>
-          <span>best {stats.best === null ? "—" : money(stats.best)}</span>
+        <button
+          onClick={onStats}
+          data-testid="open-stats"
+          className="mt-2 w-full rounded-full border border-hair py-3.5 font-mono text-xs uppercase tracking-widest"
+        >
+          Statistics
+        </button>
+        <div data-testid="countdown" className="mt-3 text-center font-mono text-xs uppercase tracking-widest text-muted">
+          next daily in <span className="text-ink">{countdown(left)}</span>
         </div>
       </div>
     </Panel>
   );
 }
 
-export function Recap({ s, mode, dailyShare }: {
+export function Recap({ s, mode, dailyShare, onStats }: {
   s: SoloState;
   mode: "misere" | "normal";
   dailyShare?: { result: DailyResult | null; stats: DailyStats };
+  onStats?: () => void;
 }) {
   const misere = mode === "misere";
   const truePnl = soloTruePnl(s);
   const botPnl = soloBotPnl(s);
   const stats = useMemo(() => decompose(s.fills, s.vPath, s.invPath, s.quoteLog), [s]);
   const score = misere ? -truePnl : truePnl;
-  const v = verdict(mode, score);
+  const v = verdict(mode, score, stats);
   const maxAbs = Math.max(Math.abs(stats.sharpEdge), Math.abs(stats.noiseEdge), Math.abs(stats.invPnl), 1);
   const chartData = useMemo(
     () => s.vPath.map((V, i) => ({ t: i, V, fill: s.fills.find((f) => f.t === i)?.price ?? null })),
@@ -56,10 +67,18 @@ export function Recap({ s, mode, dailyShare }: {
 
   return (
     <div className="flex flex-col gap-4">
-      <div data-testid="verdict" className="overflow-hidden rounded-lg border border-hair bg-panel">
+      <div data-testid="verdict" className="relative overflow-hidden rounded-lg border border-hair bg-panel">
         <div className="newsprint max-h-56">
           <img src={v.img} alt="" width={v.w} height={v.h} />
         </div>
+        {v.stamp && (
+          <div
+            data-testid="stamp"
+            className="pointer-events-none absolute right-2 top-24 -rotate-12 rounded-sm border-4 border-red px-3 py-1 text-center font-display text-sm font-black uppercase leading-tight tracking-tight text-red opacity-80"
+          >
+            {v.stamp}
+          </div>
+        )}
         <div className="p-5 text-center">
           <h2 className="font-display text-3xl font-black uppercase leading-tight tracking-tight">
             {v.headline}
@@ -103,7 +122,9 @@ export function Recap({ s, mode, dailyShare }: {
         </Suspense>
       </Panel>
 
-      {dailyShare?.result && <DailyShareBlock result={dailyShare.result} stats={dailyShare.stats} />}
+      {dailyShare?.result && (
+        <DailyShareBlock result={dailyShare.result} dec={stats} onStats={onStats ?? (() => {})} />
+      )}
 
       <Panel className="p-4">
         <div className="text-xs uppercase tracking-widest text-muted">Desk head review</div>

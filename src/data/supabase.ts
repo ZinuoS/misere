@@ -4,11 +4,21 @@ import type { Identity } from "./identity";
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
+// Un-substituted placeholders are NOT configuration. Without this the app believes
+// it is live, points at a host that does not resolve, and every claim/submit fails.
+const PLACEHOLDER = /YOURPROJECT|YOUR_ANON_KEY|your-project|<.*>/i;
+const configured = Boolean(url && anon && !PLACEHOLDER.test(url) && !PLACEHOLDER.test(anon));
+if (url && anon && !configured) {
+  console.warn(
+    "[misere-desk] VITE_SUPABASE_* still hold placeholder values - running on the local fallback registry.",
+  );
+}
+
 // ponytail: when env vars are absent (local dev, pre-provisioning) every call
 // falls back to a localStorage registry with the same shapes. Set the two env
 // vars and run supabase/migrations/0001_init.sql and this file goes live unchanged.
 // supabase-js is dynamically imported so it stays out of the first-paint bundle.
-export const isLive = Boolean(url && anon);
+export const isLive = configured;
 let sbPromise: Promise<SupabaseClient> | null = null;
 const getSb = (): Promise<SupabaseClient> | null => {
   if (!isLive) return null;

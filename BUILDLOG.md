@@ -100,3 +100,55 @@ Gate is ≥ 85: **93 passes.**
 **Smelled wrong:** the service worker caches "/" on every navigation — a deploy leaves one stale load until the SW updates. Fine for a game; bump `CACHE` on releases that change the shell.
 
 **Would fix with more time:** self-host the three font families. Non-blocking loading got the score to 93, but LCP at 3.1s is still font-swap-dominated; self-hosting is the real fix.
+
+## M6b — Amended spec: verdict ladder, doctrine completion, PWA hardening
+
+**Verdict ladder (verbatim copy, calibrated bands).** 1,000 seeded misère games across the three dummy policies. The provisional bands assumed a much narrower distribution than the engine produces:
+
+```
+n=1000, zero-fill games: 0
+min -174.21  p25 -6.07  median 17.40  p75 54.63  p90 92.60  p95 114.50  p99 171.00  max 219.10
+```
+
+| Tier | Provisional | Provisional share | **Calibrated** | **Share** |
+|---|---|---|---|---|
+| GENERATIONAL WEALTH (WRONG GAME) | profit ≥ 15 | 16.0% | profit ≥ 15 | 16.0% |
+| ACCIDENTAL RAINMAKER | +5 to +15 | 10.2% | +5 to +15 | 10.2% |
+| SPREAD GOBLIN | +1 to +5 | 4.3% | +1 to +5 | 4.3% |
+| THE EFFICIENT MARKET HYPOTHESIS (DEROGATORY) | -1 to +1 | 2.3% | -1 to +1 | 2.3% |
+| PETTY CASH ARSONIST | 1-8 | 7.9% | **1-10** | 9.9% |
+| MONEY BURNER | 8-16 | 7.6% | **10-25** | 13.4% |
+| GUH. | 16-25 | 7.8% | **25-45** | 14.2% |
+| CERTIFIED TOXIC | 25-35 | 7.8% | **45-75** | 13.4% |
+| SUPERFUND SITE | 35-45 | 6.4% | **75-150** | 14.6% |
+| FINAL BOSS OF ADVERSE SELECTION | 45+ | **29.7%** | **150+** | **1.7%** |
+
+Provisional bands put 29.7% of games in the apex tier. Calibrated: apex starts at p98.3, the modal outcome (median $17.40) lands on MONEY BURNER — position 6 of 10, mid-ladder — and every tier is reachable. The profit-side bands are semantically anchored (any profit is failure) so they were left at spec values. Script committed at `src/test/calibrate.ts`.
+
+GHOST DESK override and both stamps are unit-tested on constructed cases: inventory >60% of losses fires LUCK, NOT CRAFT; sharps >70% with ≥5 sharp fills fires PRECISION INSTRUMENT; 4 sharp fills fires neither; a profitable desk and a ghost desk never stamp. Comedy guardrails re-read across all copy — grep for self-harm/despair terms returns nothing.
+
+**Doctrine completed.** How-to-play modal now carries the SVG diagram (quotes straddling a hidden fair value, a sharp lifting the mispriced side) and is reachable any time from a "?" control in the header. Stats modal: played / best / streak / max plus a score-distribution histogram over the calibrated bands. Countdown to the next daily on both the home card and the results screen. Instructive empty states throughout.
+
+**Daily hardened.** Seed now derives from the **UTC** date (was local) — unit-tested that 23:30 UTC on the 4th is still tape #4 regardless of the viewer's zone. Determinism test extended: a different date must produce a different V path, not just a different seed. Dummy grew a daily row: replays the date-seed twice, asserts the tapes are byte-identical, and asserts a second scored submission is rejected.
+
+**Literal share card** (daily #1, engine-played):
+
+```
+MISERE DESK #1
+made $15.76 (wrong game)
+XXXXXXXXXXX▓▓▓
+sharps ███░░░░░ -$10.27
+noise  ░░░░░░░░ +$1.07
+drift  ████████ +$24.96
+https://misere-desk.vercel.app
+```
+
+Box-drawing and block elements only; the emoji grep passes. Strip is one glyph per fill — X for sharp, ▓ for noise.
+
+**PWA hardened.** Maskable 192/512 icons added alongside the "any" pair (mark inside the 80% safe zone). iOS meta tags: `apple-mobile-web-app-capable`, status-bar style, app title, touch icon. Offline queue moved from localStorage to **IndexedDB** per spec, with a "Queued. It sends when you reconnect." toast. Unobtrusive add-to-home-screen hint from the second visit, suppressed in standalone display mode. Supabase is never cached: the service worker only handles same-origin GETs, so cross-origin RPC and leaderboard reads always hit the network. App Store / Play Store not attempted — Capacitor is the later path if the data collection justifies it.
+
+**Caught a live bug the stale server was hiding.** A `vite preview` left running from the Lighthouse pass was reused by Playwright (`reuseExistingServer`), so a whole screenshot run rendered a stale build and looked green. After killing it, 24 of 26 shots failed at the handle gate: `.env.local` contained the un-substituted placeholder example (`YOURPROJECT` / `YOUR_ANON_KEY`), so `isLive` was true, the client pointed at a host that does not resolve, and every claim failed with "registry unreachable". Fixed at the root in `data/supabase.ts`: placeholder values are no longer treated as configuration, and a console warning says so. Lesson recorded: screenshot runs must not reuse a preview server.
+
+**Verification (all after the changes):** 24 unit tests green; dummy 13 rows / 0 failures with the daily replay identical and the second submission rejected; 26 screenshot runs; all-mode smoke green on desktop and mobile; Lighthouse mobile **93** (FCP 1.7s, LCP 3.0s, CLS 0, TBT 0ms); PWA check green (standalone manifest, 4 icons, offline reload OK). Banned-word and emoji greps clean.
+
+**STILL BLOCKED — not deployed.** `.env.local` holds placeholders, not real Supabase credentials, so the migration has not run against a real project and nothing is deployed. Vercel CLI is not authenticated on this machine (`vercel login` is interactive and cannot be driven from here).

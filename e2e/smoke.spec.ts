@@ -40,13 +40,16 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   await ticks(page, 40);
   await backToModes(page);
 
-  // the daily (share card renders)
+  // the daily: share card + countdown on the results screen, result + stats on the home card
   await page.getByTestId("mode-daily").click();
   await page.getByTestId("tick").waitFor();
   await ticks(page, 40);
   await expect(page.getByTestId("daily-share")).toBeVisible();
+  await expect(page.getByTestId("share-copy")).toBeVisible();
+  await expect(page.getByTestId("countdown")).toContainText("next daily in");
   await backToModes(page);
-  await expect(page.getByTestId("share-copy")).toBeVisible(); // daily card now shows the result
+  await expect(page.getByTestId("daily-done")).toBeVisible(); // one scored attempt: replay is gone
+  await expect(page.getByTestId("mode-daily")).toHaveCount(0);
 
   // vs ERIS
   await page.getByTestId("mode-eris").click();

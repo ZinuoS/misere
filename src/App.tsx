@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { dateSeed } from "./engine/rng";
 import { getIdentity, sha256Hex, type Identity } from "./data/identity";
 import { fetchMyTelemetry, submitGame, type GameReport } from "./data/supabase";
+import { clearQueue, enqueue, queued } from "./data/queue";
 import { dailyStats, todayISO, type DailyStats } from "./data/daily";
 import { Gate } from "./ui/Gate";
 import { Home, type DailyResult, type ModeId } from "./ui/Home";
 import { SoloGame } from "./ui/SoloGame";
 import { CompGame } from "./ui/CompGame";
+import { HowToPlay, StatsModal } from "./ui/Modals";
 import { LOADING_LINES } from "./ui/verdicts";
 
 const HEADLINES = [
@@ -22,7 +24,7 @@ const HEADLINES = [
 const seedParam = Number(new URLSearchParams(window.location.search).get("seed"));
 const BASE_SEED = Number.isFinite(seedParam) && seedParam > 0 ? seedParam : Date.now();
 
-const EMPTY_STATS: DailyStats = { played: 0, streak: 0, maxStreak: 0, best: null };
+const EMPTY_STATS: DailyStats = { played: 0, streak: 0, maxStreak: 0, best: null, scores: [] };
 
 const loadDailyResult = (today: string): DailyResult | null => {
   try {
@@ -33,24 +35,27 @@ const loadDailyResult = (today: string): DailyResult | null => {
   }
 };
 
-// offline queue: failed submissions persist and flush on reconnect
-const QKEY = "md:queue";
-const readQueue = (): GameReport[] => {
-  try { return JSON.parse(localStorage.getItem(QKEY) || "[]") as GameReport[]; } catch { return []; }
-};
-const writeQueue = (q: GameReport[]) => localStorage.setItem(QKEY, JSON.stringify(q));
-
 export default function App() {
   const [identity, setIdentity] = useState<Identity | null>(getIdentity);
   const [mode, setMode] = useState<ModeId | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [onboard, setOnboard] = useState(() => !localStorage.getItem("md:onboard"));
-  const [toast, setToast] = useState<GameReport | null>(null);
+  const [showStats, setShowStats] = useState(false);
+  const [toast, setToast] = useState<"queued" | null>(null);
+  const [a2hs, setA2hs] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const today = todayISO();
   const [dailyResult, setDailyResult] = useState<DailyResult | null>(() => loadDailyResult(today));
   const [stats, setStats] = useState<DailyStats>(EMPTY_STATS);
   const lineRef = useRef(0);
+
+  // "add to home screen" hint, second visit onward, standalone excluded
+  useEffect(() => {
+    const visits = Number(localStorage.getItem("md:visits") || "0") + 1;
+    localStorage.setItem("md:visits", String(visits));
+    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    if (visits >= 2 && !standalone && !localStorage.getItem("md:a2hs")) setA2hs(true);
+  }, []);
 
   useEffect(() => {
     if (!identity) return;
@@ -61,40 +66,18 @@ export default function App() {
     })();
   }, [identity, refreshKey, today]);
 
-  const report = async (r: GameReport) => {
-    if (!identity) return;
-    if (r.dailyDate) {
-      const result: DailyResult = {
-        date: r.dailyDate,
-        score: -r.pnl,
-        sharp: r.sharpEdge,
-        noise: r.noiseEdge,
-        inv: r.invPnl,
-      };
-      localStorage.setItem("md:daily", JSON.stringify(result));
-      setDailyResult(result);
-    }
-    try {
-      await submitGame(identity, await sha256Hex(identity.secret), r);
-      setToast(null);
-      setRefreshKey((k) => k + 1);
-    } catch {
-      writeQueue([...readQueue(), r]); // telemetry must never silently drop
-      setToast(r);
-    }
-  };
-
-  // flush queued submissions on load, on reconnect, and from the retry toast
+  // flush queued submissions on load, on reconnect, and from the toast
   const flush = useCallback(async () => {
     if (!identity) return;
-    const q = readQueue();
+    const q = await queued().catch(() => [] as GameReport[]);
     if (!q.length) return;
-    const failed: GameReport[] = [];
     const hash = await sha256Hex(identity.secret);
+    const failed: GameReport[] = [];
     for (const r of q) {
       try { await submitGame(identity, hash, r); } catch { failed.push(r); }
     }
-    writeQueue(failed);
+    await clearQueue();
+    for (const r of failed) await enqueue(r);
     if (!failed.length) {
       setToast(null);
       setRefreshKey((k) => k + 1);
@@ -106,6 +89,22 @@ export default function App() {
     window.addEventListener("online", flush);
     return () => window.removeEventListener("online", flush);
   }, [flush]);
+
+  const report = async (r: GameReport) => {
+    if (!identity) return;
+    if (r.dailyDate) {
+      const result: DailyResult = { date: r.dailyDate, score: -r.pnl };
+      localStorage.setItem("md:daily", JSON.stringify(result));
+      setDailyResult(result);
+    }
+    try {
+      await submitGame(identity, await sha256Hex(identity.secret), r);
+      setRefreshKey((k) => k + 1);
+    } catch {
+      await enqueue(r); // telemetry must never silently drop
+      setToast("queued");
+    }
+  };
 
   const dismissOnboard = () => {
     localStorage.setItem("md:onboard", "1");
@@ -141,11 +140,23 @@ export default function App() {
               </p>
             )}
           </div>
-          {mode && (
-            <button onClick={() => setMode(null)} className="min-h-11 text-xs uppercase tracking-widest text-muted">
-              &larr; modes
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {mode && (
+              <button onClick={() => setMode(null)} className="min-h-11 px-2 text-xs uppercase tracking-widest text-muted">
+                &larr; modes
+              </button>
+            )}
+            {identity && (
+              <button
+                onClick={() => setOnboard(true)}
+                data-testid="help"
+                aria-label="How to play"
+                className="h-11 w-11 rounded-full border border-hair font-mono text-sm"
+              >
+                ?
+              </button>
+            )}
+          </div>
         </header>
 
         {!identity && <Gate onClaimed={setIdentity} />}
@@ -160,6 +171,7 @@ export default function App() {
                 dailyResult={dailyResult}
                 stats={stats}
                 refreshKey={refreshKey}
+                onStats={() => setShowStats(true)}
               />
             )}
             {!loading && (mode === "misere" || mode === "normal") && (
@@ -171,6 +183,7 @@ export default function App() {
                 seed={dateSeed(today)}
                 daily={today}
                 dailyShare={{ result: dailyResult, stats }}
+                onStats={() => setShowStats(true)}
                 onExit={() => setMode(null)}
                 report={report}
               />
@@ -188,32 +201,29 @@ export default function App() {
 
       {toast && (
         <div data-testid="retry-toast" className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center justify-between rounded-lg border border-red bg-paper p-3 shadow-xl">
-          <span className="font-mono text-xs uppercase tracking-widest text-red">Telemetry lost in the mail.</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-red">
+            Queued. It sends when you reconnect.
+          </span>
           <button onClick={flush} className="rounded-full bg-ink px-4 py-2 font-mono text-xs uppercase tracking-widest text-paper">
             Retry
           </button>
         </div>
       )}
 
-      {onboard && identity && !mode && (
-        <div data-testid="onboard" className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-6">
-          <div className="w-full max-w-sm rounded-lg border border-hair bg-paper p-6 shadow-xl">
-            <h2 className="font-display text-2xl font-black uppercase tracking-tight">How to lose</h2>
-            <ul className="mt-3 flex flex-col gap-2 text-sm leading-relaxed">
-              <li><b>Quote.</b> Set a bid and an offer. Spread floor 1.00; stay within 4.00 of the print consensus.</li>
-              <li><b>Get filled.</b> Sharps know the true price; noise traders don't. Losing to sharps is the skill.</li>
-              <li><b>Lose.</b> 40 ticks. Most money destroyed wins. Profit is failure.</li>
-            </ul>
-            <button
-              onClick={dismissOnboard}
-              data-testid="onboard-dismiss"
-              className="mt-5 w-full rounded-full bg-ink py-3.5 font-mono text-sm uppercase tracking-widest text-paper"
-            >
-              Understood. Lose money.
-            </button>
-          </div>
+      {a2hs && (
+        <div data-testid="a2hs" className="fixed inset-x-4 bottom-4 z-40 mx-auto flex max-w-md items-center justify-between rounded-lg border border-hair bg-paper p-3 shadow-lg">
+          <span className="text-xs text-muted">Add to your home screen — it plays better without the browser bar.</span>
+          <button
+            onClick={() => { localStorage.setItem("md:a2hs", "1"); setA2hs(false); }}
+            className="ml-3 shrink-0 rounded-full border border-hair px-3 py-2 font-mono text-xs uppercase tracking-widest"
+          >
+            Got it
+          </button>
         </div>
       )}
+
+      {onboard && identity && !mode && <HowToPlay onClose={dismissOnboard} />}
+      {showStats && <StatsModal stats={stats} onClose={() => setShowStats(false)} />}
     </div>
   );
 }

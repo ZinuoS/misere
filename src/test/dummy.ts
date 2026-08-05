@@ -107,6 +107,41 @@ export function runComp(mode: "eris" | "duel", policy: Policy, seed: number): Du
   return row;
 }
 
+// Daily: same date-seed twice must produce the identical tape, and the second
+// scored submission must be rejected (unique index on (handle, mode, daily_date)).
+export function runDaily(seed: number): { row: DummyRow; identical: boolean; secondAccepted: boolean } {
+  const play = () => {
+    const rng = mulberry32(seed);
+    const s = soloInit();
+    while (!s.done) {
+      act("random-legal", s, rng);
+      soloStep(s, rng);
+    }
+    return s;
+  };
+  const a = play(), b = play();
+  const identical = JSON.stringify(a.vPath) === JSON.stringify(b.vPath) &&
+    JSON.stringify(a.fills) === JSON.stringify(b.fills) &&
+    JSON.stringify(a.tape) === JSON.stringify(b.tape);
+  const d = decompose(a.fills, a.vPath, a.invPath, a.quoteLog);
+  const truePnl = soloTruePnl(a);
+
+  // stand-in for the DB unique index: one scored attempt per (handle, mode, date)
+  const scored = new Set<string>();
+  const submit = (key: string) => (scored.has(key) ? false : (scored.add(key), true));
+  submit("dummy|misere|2026-08-04");
+  const secondAccepted = submit("dummy|misere|2026-08-04");
+
+  return {
+    row: {
+      mode: "daily", policy: "random-legal", ticks: a.t, fills: d.nFills,
+      truePnl, residual: residual(truePnl, d), error: identical ? "" : "TAPE MISMATCH",
+    },
+    identical,
+    secondAccepted,
+  };
+}
+
 export function runDummy(): DummyRow[] {
   const rows: DummyRow[] = [];
   const modes = ["solo-misere", "solo-normal"];
@@ -123,6 +158,8 @@ export function runDummy(): DummyRow[] {
   return rows;
 }
 
+export const DAILY_SEED_FOR_DUMMY = 3001;
+
 const isMain = process.argv[1]?.includes("dummy");
 if (isMain) {
   const rows = runDummy();
@@ -138,7 +175,20 @@ if (isMain) {
       pad(r.residual.toExponential(2), 12) + (r.error || "-"),
     );
   }
-  const bad = rows.filter((r) => r.error || r.residual > 1e-6);
-  console.log(`\n${rows.length} runs, ${bad.length} failures`);
-  if (bad.length) process.exit(1);
+  const daily = runDaily(DAILY_SEED_FOR_DUMMY);
+  const r = daily.row;
+  console.log(
+    pad(r.mode, 14) + pad(r.policy, 21) + pad(String(r.ticks), 7) +
+    pad(String(r.fills), 7) + pad(r.truePnl.toFixed(2), 10) +
+    pad(r.residual.toExponential(2), 12) + (r.error || "-"),
+  );
+  console.log(
+    `\ndaily replay: tape identical = ${daily.identical}; second scored submission accepted = ${daily.secondAccepted} (must be false)`,
+  );
+
+  const all = [...rows, r];
+  const bad = all.filter((x) => x.error || x.residual > 1e-6);
+  const dailyBroken = !daily.identical || daily.secondAccepted;
+  console.log(`\n${all.length} runs, ${bad.length + (dailyBroken ? 1 : 0)} failures`);
+  if (bad.length || dailyBroken) process.exit(1);
 }

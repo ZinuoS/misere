@@ -1,23 +1,35 @@
 import type { TelemetryRow } from "./supabase";
 
-// local calendar date, ISO shape ("sv" locale formats as YYYY-MM-DD)
-export const todayISO = () => new Date().toLocaleDateString("sv");
+// UTC date, ISO shape — every player worldwide is on the same tape at the same instant
+export const todayISO = (now = new Date()) => now.toISOString().slice(0, 10);
 
 const EPOCH = "2026-08-04"; // daily no. 1
 export const dailyNumber = (iso: string) =>
   Math.round((Date.parse(iso) - Date.parse(EPOCH)) / 86_400_000) + 1;
+
+// ms until the next UTC midnight
+export const msToNextDaily = (now = new Date()) =>
+  Date.parse(todayISO(now)) + 86_400_000 - now.getTime();
+
+export const countdown = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+};
 
 export interface DailyStats {
   played: number;
   streak: number;
   maxStreak: number;
   best: number | null;
+  scores: number[];
 }
 
 // stats over scored misère dailies from the player's telemetry
 export function dailyStats(rows: TelemetryRow[], today: string): DailyStats {
-  const days = [...new Set(rows.filter((r) => r.mode === "misere" && r.dailyDate).map((r) => r.dailyDate!))].sort();
-  const scores = rows.filter((r) => r.mode === "misere" && r.dailyDate).map((r) => -r.pnl);
+  const daily = rows.filter((r) => r.mode === "misere" && r.dailyDate);
+  const days = [...new Set(daily.map((r) => r.dailyDate!))].sort();
+  const scores = daily.map((r) => -r.pnl);
   let maxStreak = 0, run = 0, prev = NaN;
   for (const d of days) {
     const n = dailyNumber(d);
@@ -33,25 +45,53 @@ export function dailyStats(rows: TelemetryRow[], today: string): DailyStats {
     streak: gap <= 1 ? run : 0,
     maxStreak,
     best: scores.length ? Math.max(...scores) : null,
+    scores,
   };
 }
 
-// ASCII share card — box drawing + block elements only, zero emoji
-export function shareCard(dateISO: string, score: number, sharp: number, noise: number, inv: number): string {
+// Histogram over the calibrated tier bands; returns [label, count] rows.
+export const HISTOGRAM_BANDS: [number, number, string][] = [
+  [-Infinity, 1, "made money"],
+  [1, 10, "$1-10"],
+  [10, 25, "$10-25"],
+  [25, 45, "$25-45"],
+  [45, 75, "$45-75"],
+  [75, 150, "$75-150"],
+  [150, Infinity, "$150+"],
+];
+
+export const histogram = (scores: number[]) =>
+  HISTOGRAM_BANDS.map(([lo, hi, label]) => ({
+    label,
+    n: scores.filter((s) => s >= lo && s < hi).length,
+  }));
+
+// ASCII share card — box drawing + block elements only, zero emoji.
+// Fill-quality strip: one glyph per fill, sharp fills are X, noise fills are blocks.
+export function shareCard(
+  dateISO: string,
+  score: number,
+  d: { sharpEdge: number; noiseEdge: number; invPnl: number; nFills: number; nSharp: number },
+  siteUrl: string,
+): string {
   const bar = (v: number, max: number) => {
     const n = Math.round(Math.min(Math.abs(v) / (max || 1), 1) * 8);
     return "█".repeat(n) + "░".repeat(8 - n);
   };
-  const max = Math.max(Math.abs(sharp), Math.abs(noise), Math.abs(inv), 1);
-  const title = `MISÈRE DESK №${dailyNumber(dateISO)}`;
-  const line = score > 0 ? `destroyed $${score.toFixed(2)}` : `made $${(-score).toFixed(2)}, regrettably`;
+  const max = Math.max(Math.abs(d.sharpEdge), Math.abs(d.noiseEdge), Math.abs(d.invPnl), 1);
+  const amt = (v: number) => `${v < 0 ? "-" : "+"}$${Math.abs(v).toFixed(2)}`;
+  const strip = d.nFills === 0
+    ? "no fills - ghost desk"
+    : "X".repeat(Math.min(d.nSharp, 20)) + "▓".repeat(Math.min(d.nFills - d.nSharp, 20));
   return [
-    title,
-    dateISO,
-    line,
-    `sharps ${bar(sharp, max)} ${sharp < 0 ? "−" : "+"}$${Math.abs(sharp).toFixed(2)}`,
-    `noise  ${bar(noise, max)} ${noise < 0 ? "−" : "+"}$${Math.abs(noise).toFixed(2)}`,
-    `drift  ${bar(inv, max)} ${inv < 0 ? "−" : "+"}$${Math.abs(inv).toFixed(2)}`,
-    "the market makers who must lose",
+    `MISERE DESK #${dailyNumber(dateISO)}`,
+    score > 0 ? `destroyed $${score.toFixed(2)}` : `made $${(-score).toFixed(2)} (wrong game)`,
+    strip,
+    `sharps ${bar(d.sharpEdge, max)} ${amt(d.sharpEdge)}`,
+    `noise  ${bar(d.noiseEdge, max)} ${amt(d.noiseEdge)}`,
+    `drift  ${bar(d.invPnl, max)} ${amt(d.invPnl)}`,
+    siteUrl,
   ].join("\n");
 }
+
+export const SITE_URL = "https://misere-desk.vercel.app";

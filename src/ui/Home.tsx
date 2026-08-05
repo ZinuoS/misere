@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BAND, COMP_T, INV_CAP, MIN_SPREAD, SOLO_T } from "../engine/types";
-import { dailyNumber, shareCard, type DailyStats } from "../data/daily";
+import { countdown, dailyNumber, msToNextDaily, type DailyStats } from "../data/daily";
 import type { Identity } from "../data/identity";
 import { money, Panel } from "./atoms";
 import { Leaderboard, ResearchPanel } from "./Panels";
@@ -29,26 +29,22 @@ export type ModeId = (typeof MODES)[number]["id"] | "daily";
 export interface DailyResult {
   date: string;
   score: number;
-  sharp: number;
-  noise: number;
-  inv: number;
 }
 
-export function Home({ onPick, identity, today, dailyResult, stats, refreshKey }: {
+export function Home({ onPick, identity, today, dailyResult, stats, refreshKey, onStats }: {
   onPick: (m: ModeId) => void;
   identity: Identity;
   today: string;
   dailyResult: DailyResult | null;
   stats: DailyStats;
   refreshKey: number;
+  onStats: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const copyShare = () => {
-    if (!dailyResult) return;
-    navigator.clipboard
-      .writeText(shareCard(dailyResult.date, dailyResult.score, dailyResult.sharp, dailyResult.noise, dailyResult.inv))
-      .then(() => setCopied(true));
-  };
+  const [left, setLeft] = useState(msToNextDaily());
+  useEffect(() => {
+    const id = setInterval(() => setLeft(msToNextDaily()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="relative flex flex-col gap-3">
@@ -70,29 +66,37 @@ export function Home({ onPick, identity, today, dailyResult, stats, refreshKey }
         </p>
         {dailyResult ? (
           <div className="mt-3">
-            <div className="font-mono text-sm">
+            <div data-testid="daily-done" className="font-mono text-sm">
               {dailyResult.score > 0
                 ? <>destroyed <span className="text-gold">${dailyResult.score.toFixed(2)}</span></>
-                : <>made <span className="text-red">${(-dailyResult.score).toFixed(2)}</span>, regrettably</>}
+                : <>made <span className="text-red">${(-dailyResult.score).toFixed(2)}</span>, wrong game</>}
               <span className="text-muted"> &middot; streak {stats.streak} &middot; best {stats.best === null ? "—" : money(stats.best)}</span>
             </div>
             <button
-              onClick={copyShare}
-              data-testid="share-copy"
-              className="mt-3 w-full rounded-full border border-hair py-3 font-mono text-xs uppercase tracking-widest"
+              onClick={onStats}
+              data-testid="open-stats"
+              className="mt-3 w-full rounded-full border border-hair py-3.5 font-mono text-xs uppercase tracking-widest"
             >
-              {copied ? "Copied. Spread the damage." : "Copy share card"}
+              Statistics
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => onPick("daily")}
-            data-testid="mode-daily"
-            className="mt-3 w-full rounded-full bg-ink py-3.5 font-mono text-sm uppercase tracking-widest text-paper"
-          >
-            Play today's tape
-          </button>
+          <>
+            <button
+              onClick={() => onPick("daily")}
+              data-testid="mode-daily"
+              className="mt-3 w-full rounded-full bg-ink py-3.5 font-mono text-sm uppercase tracking-widest text-paper"
+            >
+              Play today's tape
+            </button>
+            {stats.played === 0 && (
+              <p className="mt-2 text-xs italic text-muted">No daily played yet. Today's tape is waiting.</p>
+            )}
+          </>
         )}
+        <div data-testid="countdown" className="mt-3 text-center font-mono text-xs uppercase tracking-widest text-muted">
+          next daily in <span className="text-ink">{countdown(left)}</span>
+        </div>
       </div>
 
       {MODES.map((m) => (

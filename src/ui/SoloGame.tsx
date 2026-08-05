@@ -11,11 +11,12 @@ import type { DailyResult } from "./Home";
 import { BigBtn, money, QuotePanel, Stat, Tape } from "./atoms";
 import { Recap } from "./Recap";
 
-export function SoloGame({ mode, seed, daily, dailyShare, onExit, report }: {
+export function SoloGame({ mode, seed, daily, dailyShare, onStats, onExit, report }: {
   mode: "misere" | "normal";
   seed: number;
   daily?: string; // ISO date of the scored daily this run represents
   dailyShare?: { result: DailyResult | null; stats: DailyStats };
+  onStats?: () => void;
   onExit: () => void;
   report: (r: GameReport) => void;
 }) {
@@ -80,7 +81,7 @@ export function SoloGame({ mode, seed, daily, dailyShare, onExit, report }: {
         </>
       ) : (
         <>
-          <Recap s={s} mode={mode} dailyShare={daily ? dailyShare : undefined} />
+          <Recap s={s} mode={mode} dailyShare={daily ? dailyShare : undefined} onStats={onStats} />
           {!daily && <BigBtn onClick={restart} testid="again">{misere ? "Lose again" : "Run it back"}</BigBtn>}
           <BigBtn subtle onClick={onExit}>{daily ? "Back to the desk" : "Change mode"}</BigBtn>
         </>

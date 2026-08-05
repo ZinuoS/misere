@@ -147,8 +147,15 @@ describe("daily determinism", () => {
     expect(run()).toBe(run());
   });
 
-  it("different dates produce different seeds", () => {
+  it("different dates produce different seeds AND different tapes", () => {
     expect(dateSeed("2026-08-04")).not.toBe(dateSeed("2026-08-05"));
+    const tape = (iso: string) => {
+      const rng = mulberry32(dateSeed(iso));
+      const s = soloInit();
+      while (!s.done) soloStep(s, rng);
+      return JSON.stringify(s.vPath);
+    };
+    expect(tape("2026-08-04")).not.toBe(tape("2026-08-05"));
   });
 });
 
