@@ -43,6 +43,36 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* newsprint halftone/duotone treatment for archival photos */
+.newsprint {
+  position: relative;
+  overflow: hidden;
+}
+.newsprint > img {
+  display: block;
+  width: 100%;
+  filter: grayscale(1) contrast(1.15) brightness(0.9) sepia(0.2);
+}
+.newsprint::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  mix-blend-mode: multiply;
+  opacity: 0.45;
+  z-index: 1;
+  pointer-events: none;
+}
+.newsprint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(11, 14, 20, 0.5) 1px, transparent 1px);
+  background-size: 3px 3px;
+  z-index: 2;
+  pointer-events: none;
+}
+
 /* marquee ticker */
 @keyframes marquee {
   from { transform: translateX(0); }

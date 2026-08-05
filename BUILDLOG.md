@@ -25,3 +25,17 @@ Self-reviews per milestone. Newest at the bottom.
 **Smelled wrong:** ERIS's 10% random flip runs AFTER her cap-guard flip, so she can randomly flip back toward her cap for one tick. Prototype behaves identically; routing eligibility still hard-caps her. Left as-is, noted.
 
 **Would fix with more time:** dummy comp rows (dummy vs ERIS, dummy vs dummy) — spec puts those in M4.
+
+## M2 — Solo UI
+
+**Built:** both solo modes playable end-to-end in the broadsheet direction. `src/ui/` — atoms (44px tap targets on every quote button), Home (mode cards, house rules, faint crowd texture), SoloGame (engine state in a ref, one reducer tick for re-render, dev-build runtime assertion that throws if the decomposition identity breaks), Recap (tabloid verdict with halftone archival image, decomposition waterfall, Recharts fair-value chart, desk-head stub per the cut line), verdicts.ts (4 misère + 4 normal tiers, loading-line bank). Marquee ticker on every screen. `?seed=N` pins the PRNG so Playwright drives deterministic outcomes; unseeded play uses the clock. Verdict colors follow the objective: hitting your objective is gold, missing it is red (prototype behavior).
+
+**Images:** five archival photos, all confirmed public domain via the Commons API (breadline, bank run, NYSE crowd, curb-market brokers x2), resized to 1200px, halftone/duotone via CSS only. Two candidate 1929 crowd photos were REJECTED for embedded AP copyright EXIF — logged in CREDITS.md.
+
+**Dummy run:** unchanged from M1 (engine untouched) — 6 rows, 0 failures.
+
+**Caught by screenshots:** (1) profit-in-misère verdict was captioned "money destroyed +$57.64" — label now flips when the objective is missed; (2) Recharts animation made charts render empty in screenshots — animation disabled, which also kills jank on phones.
+
+**Smelled wrong:** nothing structural. The seed 1 chart shows fills stopping mid-game — that's the inventory cap binding, not a bug (drift then does the damage: -61.90 of -102).
+
+**Would fix with more time:** game-aware marquee headlines and the candle rain (cut-line item 4, needs personal-best tracking which lands with the data layer).
