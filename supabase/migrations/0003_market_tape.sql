@@ -3,7 +3,7 @@
 create table if not exists market_tape (
   id int primary key default 1 check (id = 1),
   as_of date not null,
-  losers jsonb not null, -- [{"t":"XYZ","pct":-38.4}] x 5
+  losers jsonb not null, -- [{"t":"XYZ","pct":-38.4}] x 10
   updated_at timestamptz default now()
 );
 alter table market_tape enable row level security;

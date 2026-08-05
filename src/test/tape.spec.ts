@@ -15,10 +15,12 @@ const AV = {
 };
 
 describe("tapelib", () => {
-  it("parses Alpha Vantage into the 300-byte row", () => {
+  it("parses Alpha Vantage into the row, top 10", () => {
     const row = parseAv(AV, false)!;
     expect(row.as_of).toBe("2026-08-04");
-    expect(row.losers).toHaveLength(5);
+    expect(row.losers).toHaveLength(6); // fixture has 6; caps at 10
+    const eleven = { ...AV, top_losers: Array.from({ length: 14 }, (_, i) => ({ ticker: "T" + i, price: "1", change_percentage: "-" + (50 - i) + "%" })) };
+    expect(parseAv(eleven, false)!.losers).toHaveLength(10);
     expect(row.losers[0]).toEqual({ t: "NXTT", pct: -73.3 });
   });
 
@@ -55,7 +57,7 @@ describe("tapelib", () => {
     const fakes = ["F1", "F2", "F3", "F4", "F5", "F6"];
     const tape = parseAv(AV, false)!;
     const items = buildMarquee(fakes, tape);
-    expect(items.filter((i) => i.live)).toHaveLength(6); // 5 losers + AS OF
+    expect(items.filter((i) => i.live)).toHaveLength(7); // 6 losers + AS OF
     expect(items[2].live).toBe(true);
     expect(items[5].live).toBe(true);
     expect(items[2].text).toBe("TODAY'S HONOR ROLL: $NXTT -73.3%");
@@ -117,7 +119,7 @@ describe("/api/tape route", () => {
     const res = mkRes();
     await handler({}, res);
     expect(res.out.status).toBe(200);
-    expect((res.out.body as { losers: unknown[] }).losers).toHaveLength(5);
+    expect((res.out.body as { losers: unknown[] }).losers).toHaveLength(6);
     expect(upserted).toBe(true);
   });
 

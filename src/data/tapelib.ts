@@ -49,7 +49,7 @@ export function parseAv(av: unknown, filterJunk: boolean): TapeRow | null {
     .map((l) => ({ t: l.ticker, pct: Number.parseFloat(l.change_percentage), price: Number.parseFloat(l.price) }))
     .filter((l) => l.t && Number.isFinite(l.pct) && l.pct < 0)
     .filter((l) => !filterJunk || l.price >= 5)
-    .slice(0, 5)
+    .slice(0, 10)
     .map(({ t, pct }) => ({ t, pct: Math.round(pct * 10) / 10 }));
   return losers.length ? { as_of: asOf, losers } : null;
 }
