@@ -3,25 +3,57 @@ import { fetchLeaderboard, fetchMyTelemetry, type LeaderRow, type TelemetryRow }
 import type { Identity } from "../data/identity";
 import { Panel } from "./atoms";
 
+const BOARDS = {
+  misere: {
+    title: "Hall of ruin — most destroyed",
+    tab: "Ruin",
+    empty: "Empty. No one has destroyed anything yet — claim the top spot by losing badly.",
+    col: "best_misere" as const,
+    color: "var(--gold)",
+  },
+  normal: {
+    title: "The payroll — most made, regrettably",
+    tab: "Payroll",
+    empty: "Empty. Nobody has stooped to making money yet.",
+    col: "best_normal" as const,
+    color: "var(--red)", // profits are shameful; the color says so
+  },
+};
+
 export function Leaderboard({ refreshKey }: { refreshKey: number }) {
+  const [mode, setMode] = useState<keyof typeof BOARDS>("misere");
   const [rows, setRows] = useState<LeaderRow[] | null>(null);
   useEffect(() => {
-    fetchLeaderboard().then(setRows).catch(() => setRows([]));
-  }, [refreshKey]);
+    setRows(null);
+    fetchLeaderboard(mode).then(setRows).catch(() => setRows([]));
+  }, [refreshKey, mode]);
+  const b = BOARDS[mode];
   return (
     <Panel className="p-4" >
       <div data-testid="leaderboard">
-        <div className="mb-2 text-xs uppercase tracking-widest text-muted">Hall of ruin — most destroyed (solo mis&egrave;re)</div>
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-xs uppercase tracking-widest text-muted">{b.title}</span>
+          <span className="flex gap-1">
+            {(Object.keys(BOARDS) as (keyof typeof BOARDS)[]).map((m) => (
+              <button
+                key={m}
+                data-testid={`board-${m}`}
+                onClick={() => setMode(m)}
+                className={`rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest ${
+                  m === mode ? "border-ink bg-ink text-paper" : "border-hair text-muted"
+                }`}
+              >
+                {BOARDS[m].tab}
+              </button>
+            ))}
+          </span>
+        </div>
         {!rows && <p className="text-xs text-muted">Loading&hellip;</p>}
-        {rows && rows.length === 0 && (
-          <p className="text-xs italic text-muted">
-            Empty. No one has destroyed anything yet — claim the top spot by losing badly.
-          </p>
-        )}
+        {rows && rows.length === 0 && <p className="text-xs italic text-muted">{b.empty}</p>}
         {rows?.map((r, i) => (
           <div key={r.handle} className="flex justify-between py-1 font-mono text-sm">
             <span><span className="text-muted">{i + 1}.</span> {r.handle}</span>
-            <span className="text-gold">${(r.best_misere ?? 0).toFixed(2)}</span>
+            <span style={{ color: b.color }}>${(r[b.col] ?? 0).toFixed(2)}</span>
           </div>
         ))}
       </div>

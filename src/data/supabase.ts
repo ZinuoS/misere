@@ -191,24 +191,25 @@ export async function submitGame(id: Identity, r: GameReport): Promise<boolean> 
   return true;
 }
 
-export async function fetchLeaderboard(): Promise<LeaderRow[]> {
+export async function fetchLeaderboard(mode: "misere" | "normal" = "misere"): Promise<LeaderRow[]> {
+  const col = mode === "misere" ? "best_misere" : "best_normal";
   const sbp = getSb();
   if (sbp) {
     const sb = await sbp;
     const { data, error } = await sb
       .from("players")
       .select("handle,best_misere,best_normal,games")
-      .not("best_misere", "is", null)
-      .order("best_misere", { ascending: false })
+      .not(col, "is", null)
+      .order(col, { ascending: false })
       .limit(10);
     if (error) throw error;
     return data as LeaderRow[];
   }
   const players = read<LocalPlayers>(LB, {});
   return Object.entries(players)
-    .filter(([, p]) => p.best_misere !== null)
+    .filter(([, p]) => p[col] !== null)
     .map(([handle, p]) => ({ handle, ...p }))
-    .sort((a, b) => (b.best_misere ?? 0) - (a.best_misere ?? 0))
+    .sort((a, b) => (b[col] ?? 0) - (a[col] ?? 0))
     .slice(0, 10);
 }
 

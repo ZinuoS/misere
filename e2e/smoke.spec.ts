@@ -40,6 +40,11 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   // among equals is arbitrary. That this handle's write landed server-side is
   // asserted below via the research panel, which reads my_telemetry for it alone.
   await expect(page.getByTestId("leaderboard")).toContainText("$");
+  // the payroll: normal-mode bests on the second tab
+  await page.getByTestId("board-normal").click();
+  await expect(page.getByTestId("leaderboard")).toContainText("payroll");
+  await expect(page.getByTestId("leaderboard")).toContainText("$");
+  await page.getByTestId("board-misere").click();
 
   // solo normal
   await page.getByTestId("mode-normal").click();
