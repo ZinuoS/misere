@@ -82,3 +82,38 @@ test("dummy plays every mode; leaderboard row updates", async ({ page }) => {
   await expect(page.getByTestId("research")).toContainText("n=2");
   await expect(page.getByTestId("research")).toContainText("normal");
 });
+
+test("same handle + password returns to the same desk", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => localStorage.setItem("md:onboard", "1"));
+  await page.clock.setFixedTime(new Date("2026-08-05T15:00:00Z"));
+  await page.goto("/?seed=1");
+
+  const handle = uniqueHandle("lg");
+  await claim(page, handle);
+
+  // play one game so the account has something to remember it by
+  await page.getByTestId("mode-misere").click();
+  await page.getByTestId("tick").waitFor();
+  await ticks(page, 40);
+  await backToModes(page);
+  await expect(page.getByTestId("research")).toContainText("n=1");
+
+  // sign out clears the device, so the next entry must go through the registry
+  await page.getByTestId("signout").click();
+  await expect(page.getByTestId("gate-input")).toBeVisible();
+
+  // WRONG password on an existing handle is refused, not silently re-claimed
+  await page.getByTestId("gate-input").fill(handle);
+  await page.getByTestId("gate-password").fill("not-the-password");
+  await page.getByTestId("gate-claim").click();
+  await expect(page.getByTestId("gate-error")).toBeVisible();
+  await expect(page.getByTestId("daily-card")).toHaveCount(0);
+
+  // right password logs back into the SAME account, history intact
+  await page.getByTestId("gate-password").fill("desk-password-1");
+  await page.getByTestId("gate-claim").click();
+  await page.getByTestId("daily-card").waitFor({ timeout: 20000 });
+  await expect(page.getByTestId("research")).toContainText("n=1");
+  await expect(page.locator("body")).toContainText(handle);
+});

@@ -268,3 +268,29 @@ reachable. Normal ladder and the stats histogram scaled to match.
 screenshots, and the all-mode smoke green. The smoke and screenshots were run against the LOCAL
 fallback because `verify_login` does not exist in the live project yet — confirmed by probe
 (`PGRST202`). Run `supabase/migrations/0002_login.sql` and the live path works unchanged.
+
+## M6 — Shipped
+
+**Live: https://misere.vercel.app** (repo `ZinuoS/misere`, deploys from `main` on push).
+
+`0002_login.sql` applied. Probed the live login contract directly before trusting the UI to it:
+
+| Check | Result |
+| --- | --- |
+| `verify_login` on an unknown pair | false |
+| claim a fresh handle | true |
+| `verify_login` with the right hash | **true** |
+| `verify_login` with a wrong hash | **false** |
+| re-claim the same handle | **false** |
+
+**Production verification, all against the deployed URL and the real database:**
+
+- All-mode smoke green on desktop and mobile — claim, misère, normal, the daily, ERIS, duel, leaderboard and per-handle telemetry.
+- New round-trip test: claim -> play -> **sign out** -> wrong password refused -> right password returns to the SAME account with history intact (`n=1` still in the research panel). This is the feature that motivated the change, so it gets its own test rather than riding on the smoke.
+- PWA: standalone manifest, 4 icons, offline shell reload OK.
+- Lighthouse mobile **92** (FCP 1.8s, LCP 3.2s, CLS 0, TBT 0ms) — above the 85 gate.
+- Live gate reports `registry: wflzzsjnihtwpxrhixux.supabase.co - key len 208 ...diKQ5U`, zero page errors on either viewport. The masked-key value that broke the first deploy is gone.
+
+**Open, deliberately:** the leaderboard still holds e2e rows (`zz` prefix) — `supabase/cleanup_test_rows.sql` clears them, and it has to run from the SQL editor because the anon key cannot delete, which is the RLS working. Handles claimed before password accounts have a device-secret hash and no password, so they cannot be signed into; they are not in the cleanup list yet by design.
+
+**What I would do next with more time:** self-host the three font families (LCP is still font-swap-dominated), and watch whether the 13:30-20:00 UTC session window suppresses daily submissions — it is the research instrument, and two constants in `data/market.ts` widen it.
