@@ -214,3 +214,33 @@ test("m07-typed-quote", async ({ page }, ti) => {
   await expect(page.getByTestId("ask-input")).toHaveValue("340.00");
   await page.screenshot({ path: shot("m07-typed-quote", ti.project.name), fullPage: true });
 });
+
+// --- live worst movers in the marquee ---
+
+const MOCK_TAPE = {
+  as_of: new Date().toISOString().slice(0, 10),
+  losers: [
+    { t: "NXTT", pct: -73.3 }, { t: "ANSCW", pct: -66.7 }, { t: "RNWWW", pct: -65.7 },
+    { t: "PLTZ", pct: -58.7 }, { t: "RITR", pct: -57.3 },
+  ],
+};
+
+test("m09-marquee-live", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.route("**/api/tape", (r) => r.fulfill({ json: MOCK_TAPE }));
+  await page.goto("/");
+  const live = page.locator("[data-live]").first();
+  await expect(live).toContainText("$NXTT");
+  await expect(live).toHaveCSS("color", "rgb(147, 115, 0)"); // gold: losses are honored here
+  await expect(page.getByTestId("marquee")).toContainText("EOD DATA, DELAYED");
+  await page.screenshot({ path: shot("m09-marquee-live", ti.project.name) });
+});
+
+test("m09-marquee-fallback", async ({ page }, ti) => {
+  await skipOnboard(page);
+  await page.route("**/api/tape", (r) => r.fulfill({ status: 500, body: "boom" }));
+  await page.goto("/");
+  await expect(page.getByTestId("marquee")).toContainText("LOCAL DESK OVERPAYS AGAIN");
+  await expect(page.locator("[data-live]")).toHaveCount(0); // fake-only, banner intact
+  await page.screenshot({ path: shot("m09-marquee-fallback", ti.project.name) });
+});

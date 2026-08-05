@@ -10,6 +10,8 @@ import { SoloGame } from "./ui/SoloGame";
 import { CompGame } from "./ui/CompGame";
 import { HowToPlay, StatsModal } from "./ui/Modals";
 import { LOADING_LINES } from "./ui/verdicts";
+import { fetchTape } from "./data/tape";
+import { buildMarquee, type TapeRow } from "./data/tapelib";
 
 const HEADLINES = [
   "LOCAL DESK OVERPAYS AGAIN",
@@ -48,6 +50,8 @@ export default function App() {
   const [dailyResult, setDailyResult] = useState<DailyResult | null>(() => loadDailyResult(today));
   const [stats, setStats] = useState<DailyStats>(EMPTY_STATS);
   const lineRef = useRef(0);
+  const [tape, setTape] = useState<TapeRow | null>(null);
+  useEffect(() => { fetchTape().then(setTape); }, []);
 
   // "add to home screen" hint, second visit onward, standalone excluded
   useEffect(() => {
@@ -118,13 +122,15 @@ export default function App() {
     }, 700);
   };
 
+  const marquee = buildMarquee(HEADLINES, tape);
+
   return (
     <div className="min-h-screen bg-paper text-ink">
       <div className="overflow-hidden border-b border-hair bg-panel2 py-1.5">
-        <div className="marquee-track font-mono text-xs uppercase tracking-widest text-muted">
-          {[...HEADLINES, ...HEADLINES].map((h, i) => (
-            <span key={i} className="px-6">
-              {h} <span className="text-gold">&bull;</span>
+        <div data-testid="marquee" className="marquee-track font-mono text-xs uppercase tracking-widest text-muted">
+          {[...marquee, ...marquee].map((m, i) => (
+            <span key={i} className="px-6" {...(m.live ? { "data-live": "" } : {})} style={m.live ? { color: "var(--gold)" } : undefined}>
+              {m.text} <span className="text-gold">&bull;</span>
             </span>
           ))}
         </div>

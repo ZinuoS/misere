@@ -433,3 +433,39 @@ PWA offline reload OK; Lighthouse mobile **91** (CLS 0, TBT 0ms); live gate repo
 registry and key, zero page errors. Leaderboard is already on the new score scale — top spot is a
 real player at $1,637.84 destroyed, above the e2e rows at $1,516.20 (cleanup SQL still available
 to clear the zz rows).
+
+## Live worst movers in the marquee
+
+One table, one route, marquee only, as specified. `market_tape` holds exactly one row
+(id=1, check-constrained), upserted in place by `/api/tape`: fresh if it covers the last
+NY trading day or was refreshed under 6h ago; otherwise one Alpha Vantage call server-side,
+top 5 losers, upsert with the service-role key. Race between first visitors = at most one
+redundant call, no locking, per spec. All keys server-side; the client bundle contains none.
+
+**Measured stored row: 195 bytes** (id + as_of + 5 losers + updated_at as JSON). Total
+additional storage forever: one row, under the ~300-byte budget.
+
+Client fetches `/api/tape` once per session, caches in localStorage keyed by usability
+(as_of within 5 calendar days, non-empty losers); every failure path — 500, 204, timeout,
+stale — degrades silently to the fake-only marquee. Interleave: every third item is a real
+loser in gold (losses are honored here), rotating the three verbatim templates, with the
+`EOD DATA, DELAYED — AS OF {date}` trailer. Guardrail enforced by construction: templates
+accept ticker and percentage only, so live-tape copy cannot editorialize about a company;
+the unit test also greps live items for emoji.
+
+`TAPE_FILTER_JUNK` defaults false — today's real losers are warrants trading at $0.0012,
+which is exactly the obscure wreckage the register wants.
+
+**Verified:** 57 unit tests (parse, junk filter, freshness windows, weekend rollback to
+Friday, 5-day client guard, interleave positions and verbatim template output, and the
+route with a mocked fetch: fresh row -> ZERO external calls, stale -> refresh + upsert,
+API down -> stale row served, nothing anywhere -> 204). E2E: mocked /api/tape renders a
+gold live item between fakes with the AS OF trailer; a 500 leaves the banner intact and
+fake-only. 40 screenshot runs green.
+
+**Caught while testing:** the route originally read env at module load; per-request reads
+made it testable and deploy-order-proof.
+
+**Needs the dashboard (user):** run the combined SQL (cleanup + market_tape, on clipboard);
+add `ALPHAVANTAGE_KEY` and `SUPABASE_SERVICE_ROLE_KEY` to Vercel env. Until then /api/tape
+returns 204 and the marquee runs fake-only — by design.
