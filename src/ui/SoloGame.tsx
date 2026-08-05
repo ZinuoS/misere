@@ -50,7 +50,7 @@ export function SoloGame({ mode, seed, onExit, onDone }: {
         <>
           <div className="flex items-center justify-between rounded-lg border border-hair bg-panel p-4">
             <Stat label="P&L (marked)" value={money(mtm)} color={good ? "var(--gold)" : "var(--red)"} />
-            <Stat label="Position" value={(s.inv > 0 ? "+" : "") + s.inv} color={Math.abs(s.inv) >= INV_CAP ? "var(--red)" : "var(--bone)"} />
+            <Stat label="Position" value={(s.inv > 0 ? "+" : "") + s.inv} color={Math.abs(s.inv) >= INV_CAP ? "var(--red)" : "var(--ink)"} />
             <Stat label="Tick" value={`${s.t}/${SOLO_T}`} />
           </div>
           <QuotePanel

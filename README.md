@@ -1,32 +1,35 @@
-# React + TypeScript + Vite
+# Misère Desk
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Market making in reverse: the player must lose as much money as possible under real
+market-making constraints (spread floor, price band, inventory cap, ~45% informed flow).
+Glosten–Milgrom, sign flipped. Built as a research instrument for loss-seeking behavior.
 
-Currently, two official plugins are available:
+## Pre-registered hypothesis
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+*Written 2026-08-04, before the first player data was collected.*
 
-## React Compiler
+**Primary (conditional on the daily tape).** On daily D, every player faces the
+bit-identical exogenous tape (same date-seed, same prints, same customer arrivals).
+Misère play is the mirror image of normal play under reflection of the objective, so
+rational play predicts: the distribution of quote skew in misère mode on daily D is the
+reflection of the normal-mode distribution on the same daily. We test whether it is
+instead *shifted beyond* the reflection — |skew| and sharp-fill share in misère exceeding
+the mirrored normal-mode prediction — i.e., loss-seeking in excess of the mirror image
+(prospect-theory overshoot in the loss domain). The tape enters as a fixed effect: paired
+per-daily comparisons (Wilcoxon on |skew|, paired by daily date) remove tape luck from
+the variance.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Secondary.** The original aggregate version: pooled across non-daily practice games,
+|skew| and sharp-fill share run higher in misère than reflected-normal play predicts.
+Noisier (tape not controlled); reported alongside, not instead.
 
-## Expanding the Oxlint configuration
+Telemetry per game: pnl, sharp edge, noise edge, inventory pnl, fills, sharp fills,
+avg spread, avg skew, duration. Decomposition identity `pnl = sharp + noise + inventory`
+is enforced by unit test and dev-build runtime assertion.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Stack
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Vite + React 18 + TypeScript + Tailwind. Pure seeded engine (`src/engine/`, zero React
+imports, one injected mulberry32 PRNG). Supabase for handles, telemetry, leaderboard.
+Vitest unit suite; Playwright screenshots + dummy-player smoke runs. See `BUILDLOG.md`
+for the milestone-by-milestone story and `CREDITS.md` for image licenses.

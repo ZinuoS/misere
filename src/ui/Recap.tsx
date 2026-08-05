@@ -29,7 +29,7 @@ export function Recap({ s, mode }: { s: SoloState; mode: "misere" | "normal" }) 
           <img src={v.img} alt="" />
         </div>
         <div className="p-5 text-center">
-          <h2 className="font-display text-3xl uppercase leading-tight" style={{ color: achieved ? "var(--gold)" : "var(--red)" }}>
+          <h2 className="font-display text-3xl font-black uppercase leading-tight tracking-tight">
             {v.headline}
           </h2>
           <p className="mt-2 text-xs uppercase tracking-widest text-muted">{v.sub}</p>
@@ -52,13 +52,13 @@ export function Recap({ s, mode }: { s: SoloState; mode: "misere" | "normal" }) 
           <WBar label="inventory drift" value={stats.invPnl} max={maxAbs} goodWhenNegative={misere} />
           <div className="mt-3 flex justify-between border-t border-hair pt-2 text-xs">
             <span className="text-muted">total (identity check)</span>
-            <span className="font-mono text-bone">{money(stats.sharpEdge + stats.noiseEdge + stats.invPnl)}</span>
+            <span className="font-mono text-ink">{money(stats.sharpEdge + stats.noiseEdge + stats.invPnl)}</span>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-muted">
             {misere
               ? "Skill is the sharps bar: losses there mean you found fair value and quoted against it. Noise donations and inventory luck don't count as craft."
               : "Skill is noise capture net of the sharps bar. Inventory drift is the part you can't claim."}{" "}
-            Honest bot, same tape: <span className="font-mono text-bone">{money(botPnl)}</span>.
+            Honest bot, same tape: <span className="font-mono text-ink">{money(botPnl)}</span>.
             Avg spread {stats.avgSpread.toFixed(2)}, avg skew {stats.avgSkew >= 0 ? "+" : ""}{stats.avgSkew.toFixed(2)}.
           </p>
         </div>
@@ -71,9 +71,9 @@ export function Recap({ s, mode }: { s: SoloState; mode: "misere" | "normal" }) 
             <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
               <XAxis dataKey="t" tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--hair)" />
               <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--hair)" />
-              <Tooltip contentStyle={{ background: "var(--panel2)", border: "1px solid var(--hair)", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "var(--muted)" }} />
+              <Tooltip contentStyle={{ background: "var(--paper)", border: "1px solid var(--hair)", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "var(--muted)" }} />
               <ReferenceLine y={100} stroke="var(--hair)" strokeDasharray="3 3" />
-              <Line type="monotone" dataKey="V" stroke="var(--bone)" dot={false} strokeWidth={1.5} name="fair value" isAnimationActive={false} />
+              <Line type="monotone" dataKey="V" stroke="var(--ink)" dot={false} strokeWidth={1.5} name="fair value" isAnimationActive={false} />
               <Scatter dataKey="fill" fill="var(--gold)" name="your fills" isAnimationActive={false} />
             </ComposedChart>
           </ResponsiveContainer>
@@ -82,7 +82,7 @@ export function Recap({ s, mode }: { s: SoloState; mode: "misere" | "normal" }) 
 
       <Panel className="p-4">
         <div className="text-xs uppercase tracking-widest text-muted">Desk head review</div>
-        <p className="mt-2 font-display text-sm uppercase tracking-wide text-bone">
+        <p className="mt-2 font-display text-sm font-black uppercase tracking-wide text-ink">
           Reviews resume when the desk head returns from the Hamptons.
         </p>
       </Panel>

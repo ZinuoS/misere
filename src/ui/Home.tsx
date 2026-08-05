@@ -27,7 +27,7 @@ export function Home({ onPick }: { onPick: (m: ModeId) => void }) {
     <div className="relative flex flex-col gap-3">
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center opacity-[0.06] grayscale"
+        className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center opacity-[0.045] grayscale"
         style={{ backgroundImage: "url(/img/crowd-nyse.jpg)" }}
       />
       {MODES.map((m) => (
@@ -39,7 +39,7 @@ export function Home({ onPick }: { onPick: (m: ModeId) => void }) {
           className="rounded-lg border border-hair bg-panel p-4 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
         >
           <div className="flex items-baseline justify-between">
-            <span className="font-display text-xl uppercase tracking-wide" style={{ color: m.id === "normal" ? "var(--p2)" : "var(--gold)" }}>
+            <span className="font-display text-xl font-black uppercase tracking-tight" style={{ color: m.id === "normal" ? "var(--p2)" : "var(--gold)" }}>
               {m.title}
             </span>
             {!m.live && <span className="font-mono text-xs uppercase tracking-widest text-muted">opens late tonight</span>}

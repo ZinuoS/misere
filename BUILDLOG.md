@@ -39,3 +39,19 @@ Self-reviews per milestone. Newest at the bottom.
 **Smelled wrong:** nothing structural. The seed 1 chart shows fills stopping mid-game — that's the inventory cap binding, not a bug (drift then does the damage: -61.90 of -102).
 
 **Would fix with more time:** game-aware marquee headlines and the candle rain (cut-line item 4, needs personal-best tracking which lands with the data layer).
+
+## M2R — Ship-prompt amendment: NYT restyle + doctrine
+
+**Directive change:** white background, NYT color scheme, seven-rule NYT games doctrine ranked above styling; daily + share card promoted to cut-line priority 2; PWA now a hard M6 gate; `daily_date` unique index folds into the M3 migration.
+
+**Restyle:** paper white, ink #121212, hairlines, Wordle-derived accents kept at text contrast (gold #937300, red #b3231f, green #4a7d45, NYT blue bid). Blackletter masthead (UnifrakturMaguntia — the NYT masthead register), Libre Franklin 400/600/900 everywhere else (Franklin Gothic is NYT's own UI lineage), IBM Plex Mono tabular numbers stay. Black pill CTAs (Wordle-style). Halftone treatment retuned for white cards. Inverted semantics kept: objective hit = gold, missed = red.
+
+**Doctrine items landed now:** 15-second onboarding modal ("How to lose", 3 bullets, first visit only, localStorage flag); tile-flip animation on the newest tape entry (reduced-motion respected); instructive tape empty state; compact in-game header so play is one screen at 390px. Daily/stats/streaks/share card need the data layer — they land after M3 with the schema.
+
+**Engine:** `dateSeed()` (FNV-1a over ISO date) added; determinism test proves two engine instances from the same date-seed produce bit-identical tapes (vPath, fills, quotes, tape JSON-equal). 13 tests green.
+
+**README:** pre-registration written before first player data — primary hypothesis is now conditional-on-tape (per-daily paired Wilcoxon on |skew|, tape as fixed effect), aggregate version demoted to secondary.
+
+**Smelled wrong:** UnifrakturMaguntia has no true italics/weights and will render fallback-serif if Google Fonts is unreachable — acceptable, masthead-only. Onboarding copy is 3 sentences; timed myself reading it, ~9 seconds.
+
+**Would fix with more time:** self-hosting fonts now matters more (3 families); still deferring to M6 Lighthouse evidence.

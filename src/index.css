@@ -1,41 +1,44 @@
 @import "tailwindcss";
 
-/* palette tokens — inverted semantics: losses gold (celebrated), profits red (shameful) */
+/* NYT games palette on paper white — inverted semantics kept:
+   losses gold (celebrated), profits red (shameful) */
 :root {
-  --ink: #0b0e14;
-  --panel: #141926;
-  --panel2: #1b2233;
-  --bone: #e7e2d5;
-  --muted: #8a93a6;
-  --gold: #e8b84b;
-  --red: #e4573d;
-  --bid: #7fa8c9;
-  --ask: #c98a7f;
-  --hair: #252d40;
-  --p2: #8fb6a6;
+  --paper: #ffffff;
+  --panel: #ffffff;
+  --panel2: #f2f2ef;
+  --ink: #121212;
+  --muted: #6e6e6e;
+  --hair: #e2e2e2;
+  --gold: #937300;
+  --duotone: #c9b458;
+  --red: #b3231f;
+  --bid: #326891;
+  --ask: #b3552e;
+  --p2: #4a7d45;
 }
 
 @theme {
-  --color-ink: var(--ink);
+  --color-paper: var(--paper);
   --color-panel: var(--panel);
   --color-panel2: var(--panel2);
-  --color-bone: var(--bone);
+  --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-hair: var(--hair);
   --color-gold: var(--gold);
   --color-red: var(--red);
   --color-bid: var(--bid);
   --color-ask: var(--ask);
-  --color-hair: var(--hair);
   --color-p2: var(--p2);
-  --font-display: "Anton", "Arial Narrow", sans-serif;
+  --font-masthead: "UnifrakturMaguntia", "Times New Roman", serif;
+  --font-display: "Libre Franklin", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
-  --font-sans: "Archivo", system-ui, sans-serif;
+  --font-sans: "Libre Franklin", system-ui, sans-serif;
 }
 
 body {
   margin: 0;
-  background: var(--ink);
-  color: var(--bone);
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--font-sans);
 }
 
@@ -51,15 +54,15 @@ body {
 .newsprint > img {
   display: block;
   width: 100%;
-  filter: grayscale(1) contrast(1.15) brightness(0.9) sepia(0.2);
+  filter: grayscale(1) contrast(1.1) brightness(1.02);
 }
 .newsprint::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--gold);
+  background: var(--duotone);
   mix-blend-mode: multiply;
-  opacity: 0.45;
+  opacity: 0.35;
   z-index: 1;
   pointer-events: none;
 }
@@ -67,10 +70,20 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(11, 14, 20, 0.5) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(18, 18, 18, 0.35) 1px, transparent 1px);
   background-size: 3px 3px;
   z-index: 2;
   pointer-events: none;
+}
+
+/* tile-flip feedback for fresh tape entries */
+@keyframes flipin {
+  from { transform: rotateX(90deg); opacity: 0; }
+  to { transform: rotateX(0deg); opacity: 1; }
+}
+.flip-new {
+  animation: flipin 0.35s ease-out;
+  transform-origin: top;
 }
 
 /* marquee ticker */
@@ -85,4 +98,5 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .marquee-track { animation: none; }
+  .flip-new { animation: none; }
 }

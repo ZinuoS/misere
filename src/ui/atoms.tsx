@@ -7,7 +7,7 @@ export const money = (x: number) =>
 export const Stat = ({ label, value, color }: { label: string; value: string; color?: string }) => (
   <div className="flex flex-col items-start">
     <span className="text-xs uppercase tracking-widest text-muted">{label}</span>
-    <span className="font-mono text-base" style={{ color: color || "var(--bone)" }}>{value}</span>
+    <span className="font-mono text-base" style={{ color: color || "var(--ink)" }}>{value}</span>
   </div>
 );
 
@@ -27,8 +27,8 @@ export const BigBtn = ({ onClick, children, subtle, testid }: {
   <button
     onClick={onClick}
     data-testid={testid}
-    className={`w-full rounded-md py-3.5 font-mono text-sm uppercase tracking-widest transition-transform active:scale-[0.99] ${
-      subtle ? "border border-hair bg-panel2 text-bone" : "bg-gold text-ink"
+    className={`w-full rounded-full py-3.5 font-mono text-sm uppercase tracking-widest transition-transform active:scale-[0.99] ${
+      subtle ? "border border-hair bg-paper text-ink" : "bg-ink text-paper"
     }`}
   >
     {children}
@@ -49,7 +49,7 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
     <div className="rounded-lg border bg-panel p-4" style={{ borderColor: readOnly ? "var(--hair)" : accent }}>
       <div className="mb-2 flex justify-between text-xs uppercase tracking-widest text-muted">
         <span style={{ color: accent }}>{title}</span>
-        <span>ref <span className="font-mono text-bone">{ref_.toFixed(2)}</span></span>
+        <span>ref <span className="font-mono text-ink">{ref_.toFixed(2)}</span></span>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex flex-col items-center gap-2">
@@ -64,14 +64,14 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
         </div>
         <div className="flex flex-col items-center">
           <span className="text-xs uppercase tracking-widest text-muted">spread</span>
-          <span className={`font-mono ${ask - bid <= MIN_SPREAD + 1e-9 ? "text-gold" : "text-bone"}`}>
+          <span className={`font-mono ${ask - bid <= MIN_SPREAD + 1e-9 ? "text-gold" : "text-ink"}`}>
             {(ask - bid).toFixed(2)}
           </span>
           {!readOnly && (
             <>
               <div className="mt-2 flex gap-2">
-                <QBtn tone="var(--bone)" onClick={() => onSkew!(-0.5)}>&laquo;</QBtn>
-                <QBtn tone="var(--bone)" onClick={() => onSkew!(0.5)}>&raquo;</QBtn>
+                <QBtn tone="var(--ink)" onClick={() => onSkew!(-0.5)}>&laquo;</QBtn>
+                <QBtn tone="var(--ink)" onClick={() => onSkew!(0.5)}>&raquo;</QBtn>
               </div>
               <span className="mt-1 text-xs text-muted">skew</span>
             </>
@@ -94,19 +94,25 @@ export function QuotePanel({ title, bid, ask, ref_, onAdj, onSkew, readOnly, acc
 
 const tapeColor = { sharp: "var(--red)", noise: "var(--gold)", print: "var(--bid)", sys: "var(--muted)" };
 
-export const Tape = ({ entries }: { entries: TapeEntry[] }) => (
-  <Panel className="p-3">
-    <div className="mb-2 text-xs uppercase tracking-widest text-muted">Tape</div>
-    <div className="flex max-h-32 flex-col-reverse gap-1 overflow-y-auto font-mono text-xs leading-relaxed">
-      {entries.slice(-14).map((e, i) => (
-        <div key={i} style={{ color: tapeColor[e.kind] }}>
-          <span className="text-muted">{String(e.t).padStart(2, "0")}&nbsp;</span>
-          {e.text}
-        </div>
-      ))}
-    </div>
-  </Panel>
-);
+export const Tape = ({ entries }: { entries: TapeEntry[] }) => {
+  const shown = entries.slice(-14);
+  return (
+    <Panel className="p-3">
+      <div className="mb-2 text-xs uppercase tracking-widest text-muted">Tape</div>
+      <div className="flex max-h-32 flex-col-reverse gap-1 overflow-y-auto font-mono text-xs leading-relaxed">
+        {entries.length <= 1 && (
+          <div className="text-muted italic">No flow yet. Post your quotes and someone will take the other side.</div>
+        )}
+        {shown.map((e, i) => (
+          <div key={`${e.t}-${i}`} className={i === shown.length - 1 ? "flip-new" : ""} style={{ color: tapeColor[e.kind] }}>
+            <span className="text-muted">{String(e.t).padStart(2, "0")}&nbsp;</span>
+            {e.text}
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+};
 
 // signed horizontal waterfall bar
 export const WBar = ({ label, value, max, goodWhenNegative }: {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mulberry32 } from "../engine/rng";
+import { dateSeed, mulberry32 } from "../engine/rng";
 import { clampMkt, soloInit, soloStep, soloTruePnl } from "../engine/solo";
 import {
   compInit, compStep, deskPnl, routeBuy, routeSell, skewDesk, type Desk,
@@ -130,6 +130,25 @@ describe("tape-painting regression", () => {
     }
     expect(s.fills.filter((f) => f.side === "sell").length).toBeGreaterThan(5);
     expect(Object.is(s.anchor, anchorBefore)).toBe(true);
+  });
+});
+
+describe("daily determinism", () => {
+  it("two engine instances from the same date-seed produce bit-identical tapes", () => {
+    const run = () => {
+      const rng = mulberry32(dateSeed("2026-08-04"));
+      const s = soloInit();
+      while (!s.done) {
+        act("random-legal", s, rng);
+        soloStep(s, rng);
+      }
+      return JSON.stringify({ v: s.vPath, i: s.invPath, f: s.fills, q: s.quoteLog, t: s.tape });
+    };
+    expect(run()).toBe(run());
+  });
+
+  it("different dates produce different seeds", () => {
+    expect(dateSeed("2026-08-04")).not.toBe(dateSeed("2026-08-05"));
   });
 });
 
