@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildMarquee, isFresh, isUsable, lastTradingDay, parseAv } from "../data/tapelib";
-import handler from "../../api/tape";
+// @ts-expect-error plain-JS Vercel function, deliberately untyped (see its header comment)
+import handler from "../../api/tape.js";
 
 const AV = {
   last_updated: "2026-08-04 16:15:57 US/Eastern",
@@ -79,7 +80,7 @@ describe("/api/tape route", () => {
     return {
       out,
       setHeader: () => {},
-      status(n: number) { out.status = n; return { json(b: unknown) { out.body = b; } }; },
+      status(n: number) { out.status = n; return { json(b: unknown) { out.body = b; }, end() { out.body = null; } }; },
     };
   };
   const env = process.env;
