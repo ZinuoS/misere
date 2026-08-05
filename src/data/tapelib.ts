@@ -57,10 +57,13 @@ export function parseAv(av: unknown, filterJunk: boolean): TapeRow | null {
 // Live-tape copy states ticker and percentage ONLY, reverent-deadpan. Never
 // editorialize about a named company — we celebrate the number, never the victim.
 const TEMPLATES = [
-  (t: string, pct: number) => `TODAY'S HONOR ROLL: $${t} ${pct}%`,
-  (t: string, pct: number) => `REAL ONES: $${t} DOWN ${Math.abs(pct)}% — STUDY THE CRAFT`,
-  (t: string, pct: number) => `SOMEWHERE, A DESK ACHIEVED $${t} ${pct}%. ASPIRE.`,
+  (t: string, pct: number) => `TODAY'S TOP LOSER: $${t} ${pct}%`,
+  (t: string, pct: number) => `ALSO DOWN TODAY: $${t} ${pct}%`,
+  (t: string, pct: number) => `$${t} ${pct}% ON THE DAY`,
 ];
+
+/** #1 gets the headline template; the rest alternate the two quieter ones. */
+const template = (i: number) => TEMPLATES[i === 0 ? 0 : 1 + ((i - 1) % 2)];
 
 export interface MarqueeItem {
   text: string;
@@ -75,13 +78,13 @@ export function buildMarquee(fakes: string[], tape: TapeRow | null): MarqueeItem
   while (f < fakes.length || l < tape.losers.length) {
     if (items.length % 3 === 2 && l < tape.losers.length) {
       const { t, pct } = tape.losers[l];
-      items.push({ text: TEMPLATES[l % TEMPLATES.length](t, pct), live: true });
+      items.push({ text: template(l)(t, pct), live: true });
       l++;
     } else if (f < fakes.length) {
       items.push({ text: fakes[f++], live: false });
     } else {
       const { t, pct } = tape.losers[l];
-      items.push({ text: TEMPLATES[l % TEMPLATES.length](t, pct), live: true });
+      items.push({ text: template(l)(t, pct), live: true });
       l++;
     }
   }

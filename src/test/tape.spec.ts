@@ -61,8 +61,8 @@ describe("tapelib", () => {
     expect(items.filter((i) => i.live)).toHaveLength(7); // 6 losers + AS OF
     expect(items[2].live).toBe(true);
     expect(items[5].live).toBe(true);
-    expect(items[2].text).toBe("TODAY'S HONOR ROLL: $NXTT -73.3%");
-    expect(items[5].text).toBe("REAL ONES: $ANSCW DOWN 66.7% — STUDY THE CRAFT");
+    expect(items[2].text).toBe("TODAY'S TOP LOSER: $NXTT -73.3%");
+    expect(items[5].text).toBe("ALSO DOWN TODAY: $ANSCW -66.7%");
     expect(items.at(-1)!.text).toBe("EOD DATA, DELAYED — AS OF 2026-08-04");
     // guardrail: ticker and number only — no editorializing, no emoji
     for (const i of items.filter((x) => x.live)) {

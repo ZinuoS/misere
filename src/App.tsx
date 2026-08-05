@@ -127,7 +127,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-paper text-ink">
       <div className="overflow-hidden border-b border-hair bg-panel2 py-1.5">
-        <div data-testid="marquee" className="marquee-track font-mono text-xs uppercase tracking-widest text-muted">
+        <div data-testid="marquee" className="marquee-track font-mono text-xs uppercase tracking-widest text-muted" style={{ animationDuration: `${marquee.length * 5}s` }}>
           {[...marquee, ...marquee].map((m, i) => (
             <span key={i} className="px-6" {...(m.live ? { "data-live": "" } : {})} style={m.live ? { color: "var(--gold)" } : undefined}>
               {m.text} <span className="text-gold">&bull;</span>
