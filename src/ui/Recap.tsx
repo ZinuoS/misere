@@ -1,7 +1,4 @@
-import { useMemo } from "react";
-import {
-  ComposedChart, Line, Scatter, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer,
-} from "recharts";
+import { lazy, Suspense, useMemo } from "react";
 import type { SoloState } from "../engine/solo";
 import { soloTruePnl, soloBotPnl } from "../engine/solo";
 import { decompose } from "../engine/decompose";
@@ -10,6 +7,8 @@ import { shareCard, type DailyStats } from "../data/daily";
 import type { DailyResult } from "./Home";
 import { money, Panel, WBar } from "./atoms";
 import { verdict } from "./verdicts";
+
+const Chart = lazy(() => import("./Chart"));
 
 function DailyShareBlock({ result, stats }: { result: DailyResult; stats: DailyStats }) {
   const [copied, setCopied] = useState(false);
@@ -59,7 +58,7 @@ export function Recap({ s, mode, dailyShare }: {
     <div className="flex flex-col gap-4">
       <div data-testid="verdict" className="overflow-hidden rounded-lg border border-hair bg-panel">
         <div className="newsprint max-h-56">
-          <img src={v.img} alt="" />
+          <img src={v.img} alt="" width={v.w} height={v.h} />
         </div>
         <div className="p-5 text-center">
           <h2 className="font-display text-3xl font-black uppercase leading-tight tracking-tight">
@@ -99,18 +98,9 @@ export function Recap({ s, mode, dailyShare }: {
 
       <Panel className="p-3">
         <div className="mb-2 text-xs uppercase tracking-widest text-muted">Hidden fair value &amp; your fills</div>
-        <div style={{ width: "100%", height: 200 }}>
-          <ResponsiveContainer>
-            <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-              <XAxis dataKey="t" tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--hair)" />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--hair)" />
-              <Tooltip contentStyle={{ background: "var(--paper)", border: "1px solid var(--hair)", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "var(--muted)" }} />
-              <ReferenceLine y={100} stroke="var(--hair)" strokeDasharray="3 3" />
-              <Line type="monotone" dataKey="V" stroke="var(--ink)" dot={false} strokeWidth={1.5} name="fair value" isAnimationActive={false} />
-              <Scatter dataKey="fill" fill="var(--gold)" name="your fills" isAnimationActive={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+        <Suspense fallback={<div style={{ height: 200 }} />}>
+          <Chart data={chartData} series={[{ key: "fill", color: "var(--gold)", name: "your fills" }]} />
+        </Suspense>
       </Panel>
 
       {dailyShare?.result && <DailyShareBlock result={dailyShare.result} stats={dailyShare.stats} />}

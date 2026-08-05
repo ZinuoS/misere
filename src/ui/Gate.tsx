@@ -24,7 +24,7 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="newsprint overflow-hidden rounded-lg border border-hair">
-        <img src="/img/brokers-curb.jpg" alt="" />
+        <img src="/img/brokers-curb.jpg" alt="" width={800} height={624} />
       </div>
       <h2 className="font-display text-3xl font-black uppercase tracking-tight">Claim your desk</h2>
       <p className="text-sm leading-relaxed text-muted">

@@ -1,7 +1,4 @@
-import { useMemo, useReducer, useRef } from "react";
-import {
-  ComposedChart, Line, Scatter, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer,
-} from "recharts";
+import { lazy, Suspense, useMemo, useReducer, useRef } from "react";
 import { mulberry32 } from "../engine/rng";
 import {
   adjustDesk, compInit, compStep, deskPnl, skewDesk, type CompState,
@@ -12,6 +9,7 @@ import type { GameReport } from "../data/supabase";
 import { BigBtn, money, Panel, QuotePanel, Stat, Tape } from "./atoms";
 
 const ACCENTS = ["var(--gold)", "var(--p2)"];
+const Chart = lazy(() => import("./Chart"));
 
 export function CompGame({ vsBot, seed, onExit, report }: {
   vsBot: boolean;
@@ -128,19 +126,15 @@ export function CompGame({ vsBot, seed, onExit, report }: {
           </div>
           <Panel className="p-3">
             <div className="mb-2 text-xs uppercase tracking-widest text-muted">Hidden fair value &amp; fills</div>
-            <div style={{ width: "100%", height: 200 }}>
-              <ResponsiveContainer>
-                <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
-                  <XAxis dataKey="t" tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--hair)" />
-                  <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--muted)", fontSize: 10 }} stroke="var(--hair)" />
-                  <Tooltip contentStyle={{ background: "var(--paper)", border: "1px solid var(--hair)", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "var(--muted)" }} />
-                  <ReferenceLine y={100} stroke="var(--hair)" strokeDasharray="3 3" />
-                  <Line type="monotone" dataKey="V" stroke="var(--ink)" dot={false} strokeWidth={1.5} name="fair value" isAnimationActive={false} />
-                  <Scatter dataKey="f0" fill="var(--gold)" name={s.desks[0].name} isAnimationActive={false} />
-                  <Scatter dataKey="f1" fill="var(--p2)" name={s.desks[1].name} isAnimationActive={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
+            <Suspense fallback={<div style={{ height: 200 }} />}>
+              <Chart
+                data={chartData}
+                series={[
+                  { key: "f0", color: "var(--gold)", name: s.desks[0].name },
+                  { key: "f1", color: "var(--p2)", name: s.desks[1].name },
+                ]}
+              />
+            </Suspense>
           </Panel>
           <BigBtn onClick={() => { sRef.current = null; force(); }} testid="again">Rematch</BigBtn>
           <BigBtn subtle onClick={onExit}>Change mode</BigBtn>

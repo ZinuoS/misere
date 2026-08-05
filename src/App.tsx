@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { dateSeed } from "./engine/rng";
 import { getIdentity, sha256Hex, type Identity } from "./data/identity";
 import { fetchMyTelemetry, submitGame, type GameReport } from "./data/supabase";
@@ -32,6 +32,13 @@ const loadDailyResult = (today: string): DailyResult | null => {
     return null;
   }
 };
+
+// offline queue: failed submissions persist and flush on reconnect
+const QKEY = "md:queue";
+const readQueue = (): GameReport[] => {
+  try { return JSON.parse(localStorage.getItem(QKEY) || "[]") as GameReport[]; } catch { return []; }
+};
+const writeQueue = (q: GameReport[]) => localStorage.setItem(QKEY, JSON.stringify(q));
 
 export default function App() {
   const [identity, setIdentity] = useState<Identity | null>(getIdentity);
@@ -72,9 +79,33 @@ export default function App() {
       setToast(null);
       setRefreshKey((k) => k + 1);
     } catch {
-      setToast(r); // telemetry must never silently fail
+      writeQueue([...readQueue(), r]); // telemetry must never silently drop
+      setToast(r);
     }
   };
+
+  // flush queued submissions on load, on reconnect, and from the retry toast
+  const flush = useCallback(async () => {
+    if (!identity) return;
+    const q = readQueue();
+    if (!q.length) return;
+    const failed: GameReport[] = [];
+    const hash = await sha256Hex(identity.secret);
+    for (const r of q) {
+      try { await submitGame(identity, hash, r); } catch { failed.push(r); }
+    }
+    writeQueue(failed);
+    if (!failed.length) {
+      setToast(null);
+      setRefreshKey((k) => k + 1);
+    }
+  }, [identity]);
+
+  useEffect(() => {
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, [flush]);
 
   const dismissOnboard = () => {
     localStorage.setItem("md:onboard", "1");
@@ -158,7 +189,7 @@ export default function App() {
       {toast && (
         <div data-testid="retry-toast" className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md items-center justify-between rounded-lg border border-red bg-paper p-3 shadow-xl">
           <span className="font-mono text-xs uppercase tracking-widest text-red">Telemetry lost in the mail.</span>
-          <button onClick={() => report(toast)} className="rounded-full bg-ink px-4 py-2 font-mono text-xs uppercase tracking-widest text-paper">
+          <button onClick={flush} className="rounded-full bg-ink px-4 py-2 font-mono text-xs uppercase tracking-widest text-paper">
             Retry
           </button>
         </div>

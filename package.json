@@ -11,7 +11,8 @@
     "test": "vitest run",
     "dummy": "tsx src/test/dummy.ts",
     "shots": "playwright test e2e/shots.spec.ts",
-    "e2e": "playwright test e2e/smoke.spec.ts"
+    "e2e": "playwright test e2e/smoke.spec.ts",
+    "pwa": "node e2e/pwa-check.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",

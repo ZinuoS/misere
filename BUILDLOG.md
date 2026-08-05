@@ -79,3 +79,24 @@ Self-reviews per milestone. Newest at the bottom.
 **Smelled wrong:** (1) e2e claims write real rows when env vars are set — the M6 production run needs a throwaway handle convention (dummy_*) or a test-data sweep; noted for M6. (2) `my_telemetry` RPC is new surface beyond the original spec — required because telemetry has RLS with no select policy; flagging so it gets reviewed. (3) With `?seed=` pinned, consecutive solo games replay the same tape (component remount resets the offset) — correct for e2e, invisible in production where the clock seeds.
 
 **Would fix with more time:** queue failed submissions in localStorage and flush on reconnect — the PWA offline requirement will force this at M6 anyway; the retry toast covers tonight.
+
+## M6 — PWA, performance, ship (BLOCKED on credentials)
+
+**Built:** manifest (standalone, 192/512 icons rendered from the blackletter M via the installed Playwright chromium — no new dependency), service worker (network-first navigations with cached shell, cache-first assets), registration gated to PROD so dev and e2e are unaffected. Offline submission queue: failed telemetry persists to localStorage and flushes on `online` and on load; the retry toast now drains the queue rather than resubmitting one payload.
+
+**Performance — Lighthouse mobile, three passes:**
+- 47 (FCP 8.1s) — render-blocking Google Fonts + a 545 kB single bundle.
+- 77 — fonts made non-blocking (`media="print"` + onload swap); recharts and supabase-js split to dynamic imports. Initial JS 545 kB -> 181 kB.
+- **93** — CLS 0.218 -> 0 by giving every archival image intrinsic width/height, images recompressed to 800px q60 (1.1 MB -> 624 KB). FCP 1.8s, LCP 3.1s, TBT 0ms, total weight 312 KiB.
+
+Gate is ≥ 85: **93 passes.**
+
+**PWA gate:** `e2e/pwa-check.mjs` asserts the manifest is standalone with 2 icons and that a reload with the network cut still renders the app shell. Both pass against the production preview.
+
+**Verification after all M6 changes:** 17 unit tests, dummy 12 rows / 0 failures, 22 screenshot runs, all-mode smoke green on desktop and mobile. Banned-word and emoji greps clean.
+
+**BLOCKED — could not complete:** the `.env.local` referenced in the instruction is not present in the repo (or anywhere under Documents/Downloads/Desktop), and no Supabase or Vercel CLI is installed or authenticated on this machine. So: the migration was NOT run against a real project, the smoke did NOT run against real Supabase, and NOTHING was deployed. Everything above was verified against the local fallback registry and a local production preview. No code changes are expected when credentials land — set the two env vars, run `supabase/migrations/0001_init.sql`, redeploy, and re-run `npm run e2e` plus `node e2e/pwa-check.mjs <prod-url>`.
+
+**Smelled wrong:** the service worker caches "/" on every navigation — a deploy leaves one stale load until the SW updates. Fine for a game; bump `CACHE` on releases that change the shell.
+
+**Would fix with more time:** self-host the three font families. Non-blocking loading got the score to 93, but LCP at 3.1s is still font-swap-dominated; self-hosting is the real fix.

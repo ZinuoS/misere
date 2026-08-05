@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Identity } from "./identity";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -7,8 +7,14 @@ const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 // ponytail: when env vars are absent (local dev, pre-provisioning) every call
 // falls back to a localStorage registry with the same shapes. Set the two env
 // vars and run supabase/migrations/0001_init.sql and this file goes live unchanged.
-export const sb = url && anon ? createClient(url, anon) : null;
-export const isLive = sb !== null;
+// supabase-js is dynamically imported so it stays out of the first-paint bundle.
+export const isLive = Boolean(url && anon);
+let sbPromise: Promise<SupabaseClient> | null = null;
+const getSb = (): Promise<SupabaseClient> | null => {
+  if (!isLive) return null;
+  sbPromise ??= import("@supabase/supabase-js").then((m) => m.createClient(url!, anon!));
+  return sbPromise;
+};
 
 export interface GameReport {
   mode: "misere" | "normal" | "eris" | "duel";
@@ -46,7 +52,9 @@ const write = (k: string, v: unknown) => localStorage.setItem(k, JSON.stringify(
 type LocalPlayers = Record<string, { secret_hash: string; best_misere: number | null; best_normal: number | null; games: number }>;
 
 export async function claimHandle(handle: string, secretHash: string): Promise<boolean> {
-  if (sb) {
+  const sbp = getSb();
+  if (sbp) {
+    const sb = await sbp;
     const { data, error } = await sb.rpc("claim_handle", { p_handle: handle, p_secret_hash: secretHash });
     if (error) throw error;
     return data === true;
@@ -59,7 +67,9 @@ export async function claimHandle(handle: string, secretHash: string): Promise<b
 }
 
 export async function submitGame(id: Identity, secretHash: string, r: GameReport): Promise<boolean> {
-  if (sb) {
+  const sbp = getSb();
+  if (sbp) {
+    const sb = await sbp;
     const { data, error } = await sb.rpc("submit_game", {
       p_handle: id.handle, p_secret_hash: secretHash, p_mode: r.mode,
       p_pnl: r.pnl, p_sharp: r.sharpEdge, p_noise: r.noiseEdge, p_inv: r.invPnl,
@@ -85,7 +95,9 @@ export async function submitGame(id: Identity, secretHash: string, r: GameReport
 }
 
 export async function fetchLeaderboard(): Promise<LeaderRow[]> {
-  if (sb) {
+  const sbp = getSb();
+  if (sbp) {
+    const sb = await sbp;
     const { data, error } = await sb
       .from("players")
       .select("handle,best_misere,best_normal,games")
@@ -104,7 +116,9 @@ export async function fetchLeaderboard(): Promise<LeaderRow[]> {
 }
 
 export async function fetchMyTelemetry(id: Identity, secretHash: string): Promise<TelemetryRow[]> {
-  if (sb) {
+  const sbp = getSb();
+  if (sbp) {
+    const sb = await sbp;
     const { data, error } = await sb.rpc("my_telemetry", { p_handle: id.handle, p_secret_hash: secretHash });
     if (error) throw error;
     return (data as Record<string, unknown>[]).map((d) => ({
