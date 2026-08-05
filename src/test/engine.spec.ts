@@ -346,3 +346,35 @@ describe("dominant-strategy regression (the exploit from the 1000-level version)
     expect(bayesTotal).toBeGreaterThan(2 * camperTotal); // knowing V is worth >2x parking blind
   });
 });
+
+describe("drift attribution", () => {
+  // "You can tell the drift from pnl": invPnl must be exactly the inventory
+  // carried through each V move — including the news jump — and nothing else.
+  it("with one fill held to the end, invPnl equals inv x subsequent V moves", () => {
+    for (let seed = 1; seed <= 2000; seed++) {
+      const rng = mulberry32(seed);
+      const s = soloInit(rng);
+      while (!s.done) {
+        if (s.fills.length === 0) {
+          // camp on the anchor until something books
+          [s.bid, s.ask] = clampSolo(r2(s.anchor) - MIN_SPREAD, r2(s.anchor) + MIN_SPREAD, s.anchor);
+        } else {
+          // then park at the band edge: everything after either walks or busts
+          [s.bid, s.ask] = clampSolo(V_MIN, V_MIN + MIN_SPREAD, s.anchor);
+        }
+        soloStep(s, rng);
+      }
+      if (s.fills.length !== 1) continue;
+      const f = s.fills[0];
+      if (f.t >= s.newsTick) continue; // want the news inside the holding window
+      const d = decompose(s.fills, s.vPath, s.invPath, s.quoteLog);
+      const inv = f.side === "buy" ? -1 : 1;
+      const handComputed = inv * (s.vPath[s.vPath.length - 1] - s.vPath[f.t]);
+      expect(Math.abs(d.invPnl - handComputed)).toBeLessThan(1e-6);
+      // and the whole game reconciles: pnl = fill edge + drift
+      expect(Math.abs(soloTruePnl(s) - (f.edge + d.invPnl))).toBeLessThan(1e-6);
+      return; // one clean specimen is the proof
+    }
+    throw new Error("no single-fill-through-news specimen found in 2000 seeds");
+  });
+});
