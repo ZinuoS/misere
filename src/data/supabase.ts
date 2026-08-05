@@ -1,17 +1,36 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Identity } from "./identity";
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Dashboard copy-paste and CI env panels routinely carry a trailing newline or
+// wrapping quotes. Untrimmed, the URL becomes unparseable and every call throws
+// a bare TypeError that looks like a network outage.
+const clean = (v: string | undefined) => v?.trim().replace(/^['"]|['"]$/g, "") || undefined;
+
+const url = clean(import.meta.env.VITE_SUPABASE_URL as string | undefined);
+const anon = clean(import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined);
 
 // Un-substituted placeholders are NOT configuration. Without this the app believes
 // it is live, points at a host that does not resolve, and every claim/submit fails.
 const PLACEHOLDER = /YOURPROJECT|YOUR_ANON_KEY|your-project|<.*>/i;
-const configured = Boolean(url && anon && !PLACEHOLDER.test(url) && !PLACEHOLDER.test(anon));
-if (url && anon && !configured) {
-  console.warn(
-    "[misere-desk] VITE_SUPABASE_* still hold placeholder values - running on the local fallback registry.",
-  );
+
+/** Why the client is not live, in words a human can act on. Empty string = live. */
+export function configProblem(): string {
+  if (!url && !anon) return "no VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in this build";
+  if (!url) return "VITE_SUPABASE_URL is missing from this build";
+  if (!anon) return "VITE_SUPABASE_ANON_KEY is missing from this build";
+  if (PLACEHOLDER.test(url) || PLACEHOLDER.test(anon)) return "the env vars still hold placeholder values";
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return `VITE_SUPABASE_URL is not https (${u.protocol})`;
+  } catch {
+    return "VITE_SUPABASE_URL is not a valid URL";
+  }
+  return "";
+}
+
+const configured = configProblem() === "";
+if (!configured) {
+  console.warn(`[misere-desk] local fallback registry: ${configProblem()}`);
 }
 
 // ponytail: when env vars are absent (local dev, pre-provisioning) every call
@@ -19,12 +38,32 @@ if (url && anon && !configured) {
 // vars and run supabase/migrations/0001_init.sql and this file goes live unchanged.
 // supabase-js is dynamically imported so it stays out of the first-paint bundle.
 export const isLive = configured;
+export const backend = () => (isLive ? new URL(url!).host : "local fallback");
+
 let sbPromise: Promise<SupabaseClient> | null = null;
 const getSb = (): Promise<SupabaseClient> | null => {
   if (!isLive) return null;
-  sbPromise ??= import("@supabase/supabase-js").then((m) => m.createClient(url!, anon!));
+  sbPromise ??= import("@supabase/supabase-js").then((m) =>
+    m.createClient(url!, anon!, {
+      auth: { persistSession: false },
+      // Fail fast and say so, rather than hanging on a carrier that is
+      // swallowing the connection (roaming, captive portals, filtered DNS).
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, signal: AbortSignal.timeout(12_000) }),
+      },
+    }),
+  );
   return sbPromise;
 };
+
+/** Turn whatever the client threw into one actionable line. */
+export function describeError(e: unknown): string {
+  if (!isLive) return `not connected: ${configProblem()}`;
+  const err = e as { message?: string; code?: string; details?: string; hint?: string };
+  const bits = [err?.code, err?.message || String(e), err?.details].filter(Boolean);
+  return bits.join(" — ").slice(0, 200);
+}
 
 export interface GameReport {
   mode: "misere" | "normal" | "eris" | "duel";

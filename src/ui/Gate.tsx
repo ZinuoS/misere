@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { claimHandle } from "../data/supabase";
+import { backend, claimHandle, describeError, isLive } from "../data/supabase";
 import {
   cryptoAvailable, HANDLE_RE, InsecureContextError, newSecret, sanitizeHandle,
   saveIdentity, sha256Hex, type Identity,
@@ -10,6 +10,7 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
   const [state, setState] = useState<"idle" | "busy" | "taken" | "invalid" | "error" | "insecure">(
     cryptoAvailable() ? "idle" : "insecure",
   );
+  const [why, setWhy] = useState("");
 
   const claim = async () => {
     if (!HANDLE_RE.test(v)) return setState("invalid");
@@ -22,7 +23,10 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
       saveIdentity(id);
       onClaimed(id);
     } catch (e) {
-      setState(e instanceof InsecureContextError ? "insecure" : "error");
+      if (e instanceof InsecureContextError) return setState("insecure");
+      console.error("[misere-desk] claim failed:", e);
+      setWhy(describeError(e));
+      setState("error");
     }
   };
 
@@ -65,9 +69,12 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
         </p>
       )}
       {state === "error" && (
-        <p data-testid="gate-error" className="font-mono text-xs uppercase tracking-widest text-red">
-          The registry is unreachable. Try again.
-        </p>
+        <div data-testid="gate-error">
+          <p className="font-mono text-xs uppercase tracking-widest text-red">
+            The registry refused the claim.
+          </p>
+          {why && <p className="mt-1 break-words font-mono text-xs text-muted">{why}</p>}
+        </div>
       )}
       {state === "insecure" && (
         <p data-testid="gate-error" className="text-xs leading-relaxed text-red">
@@ -85,6 +92,10 @@ export function Gate({ onClaimed }: { onClaimed: (id: Identity) => void }) {
       </button>
       <p className="text-xs leading-relaxed text-muted">
         Your claim lives in this browser's storage; clear it and the handle is gone for good.
+      </p>
+      <p data-testid="backend" className="font-mono text-[10px] uppercase tracking-widest text-muted">
+        registry: {backend()}
+        {!isLive && " (scores stay on this device)"}
       </p>
     </div>
   );

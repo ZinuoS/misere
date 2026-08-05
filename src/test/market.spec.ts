@@ -31,3 +31,18 @@ describe("exchange session", () => {
     expect(CLOSE_MIN).toBe(1200); // 20:00 UTC = 16:00 ET
   });
 });
+
+describe("backend configuration diagnostics", () => {
+  it("names the reason it is not live, and reports the host when it is", async () => {
+    const { configProblem, isLive, backend, describeError } = await import("../data/supabase");
+    if (!isLive) {
+      expect(configProblem()).toMatch(/missing|no VITE_SUPABASE|placeholder|not a valid|not https/);
+      expect(backend()).toBe("local fallback");
+      expect(describeError(new Error("boom"))).toContain("not connected");
+    } else {
+      expect(configProblem()).toBe("");
+      expect(backend()).toContain("supabase.co");
+      expect(describeError({ code: "42501", message: "row-level security" })).toContain("42501");
+    }
+  });
+});
